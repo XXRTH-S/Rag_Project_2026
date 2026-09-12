@@ -23,14 +23,15 @@ from app.ingestion.detect import plan_document
 from app.models.document import Chunk, Document, IngestionJob
 from app.models.user import User
 from app.quota.page_count import UnsupportedFileType, count_pages
-from app.routers.documents import _detect_mime, _storage_path
+from app.routers.documents import _detect_mime, _storage_path, save_upload_within_limit
+from app.schemas.base import StrictModel
 from app.schemas.documents import DocumentOut, JobOut
 
 router = APIRouter(prefix="/api/admin/documents", tags=["admin-documents"])
 log = logging.getLogger("app.admin.documents")
 
 
-class ReprocessRequest(BaseModel):
+class ReprocessRequest(StrictModel):
     # default = เอกสารทั่วไป · structure = มีตาราง/ฟอร์ม
     task_type: str | None = Field(default=None, pattern="^(default|structure)$")
 
@@ -151,19 +152,20 @@ async def bulk_upload(
 
     for upload in files:
         name = upload.filename or "upload"
-        payload = await upload.read()
-
-        if not payload:
-            rejected.append({"filename": name, "reason": "ไฟล์ว่าง"})
-            continue
-        if len(payload) > limit:
-            rejected.append({"filename": name, "reason": f"ใหญ่เกิน {settings.max_upload_mb} MB"})
-            continue
-
-        mime = _detect_mime(payload[:4096], name)
         document_id = uuid.uuid4()
         path = _storage_path(admin.id, document_id, name)
-        path.write_bytes(payload)
+
+        # เขียนลงดิสก์ทีละส่วนแทนการอ่านทั้งไฟล์เข้า RAM — เส้นทางนี้อันตรายกว่า
+        # อัปทีละไฟล์ เพราะรับหลายไฟล์ในคำขอเดียว ถ้าอ่านทั้งก้อนทีละไฟล์
+        # หน่วยความจำจะพุ่งตามขนาดไฟล์ที่ใหญ่ที่สุดในชุด
+        try:
+            head, size_bytes = await save_upload_within_limit(upload, path, limit)
+        except HTTPException as exc:
+            # ไฟล์เดียวมีปัญหาต้องไม่ทำให้ทั้งชุดล้ม — รายงานแล้วไปต่อ
+            rejected.append({"filename": name, "reason": str(exc.detail)})
+            continue
+
+        mime = _detect_mime(head, name)
 
         try:
             estimate = count_pages(path, mime)
@@ -179,7 +181,7 @@ async def bulk_upload(
             filename=name,
             mime_type=mime,
             storage_path=str(path),
-            size_bytes=len(payload),
+            size_bytes=size_bytes,
             collection=collection,
             status="pending",
             page_count=estimate.pages,

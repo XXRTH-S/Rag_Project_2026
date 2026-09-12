@@ -60,6 +60,51 @@ def _storage_path(owner_id: uuid.UUID, document_id: uuid.UUID, filename: str) ->
     return directory / f"{document_id}{suffix}"
 
 
+# อ่านทีละ 1 MB — ใหญ่พอให้ไม่ช้า เล็กพอให้หยุดได้เร็วเมื่อไฟล์เกินเพดาน
+_READ_CHUNK = 1024 * 1024
+
+
+async def save_upload_within_limit(
+    upload: UploadFile, destination: Path, limit: int
+) -> tuple[bytes, int]:
+    """เขียนไฟล์ลงดิสก์ทีละส่วน พร้อมนับขนาดไปด้วย คืน (ส่วนหัว, ขนาดรวม)
+
+    ห้ามใช้ `await upload.read()` อ่านทั้งก้อน เพราะมันดึงไฟล์ทั้งไฟล์เข้า RAM
+    *ก่อน* ที่เราจะได้ตรวจขนาด — ส่งไฟล์ 5 GB มาก็กิน RAM 5 GB ทันที
+    บนเครื่องตัวเดียวที่แชร์กับ Postgres และ Ollama นั่นคือการล้มทั้งระบบ
+    ด้วยคำขอเดียว
+
+    อ่านทีละส่วนแล้วหยุดทันทีที่เกินเพดาน หน่วยความจำจึงคงที่ไม่ว่าไฟล์จะใหญ่แค่ไหน
+    และลบไฟล์ที่เขียนค้างไว้ก่อนโยน error ไม่ให้ดิสก์ค่อย ๆ เต็มจากคำขอที่ถูกปฏิเสธ
+    """
+    total = 0
+    head = b""
+    try:
+        with destination.open("wb") as sink:
+            while True:
+                block = await upload.read(_READ_CHUNK)
+                if not block:
+                    break
+                total += len(block)
+                if total > limit:
+                    raise HTTPException(
+                        status.HTTP_413_CONTENT_TOO_LARGE,
+                        f"ไฟล์ใหญ่เกิน {settings.max_upload_mb} MB",
+                    )
+                if len(head) < 4096:
+                    head += block[: 4096 - len(head)]
+                sink.write(block)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+
+    if total == 0:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "ไฟล์ว่าง")
+
+    return head, total
+
+
 @router.post("", response_model=UploadAccepted, status_code=status.HTTP_202_ACCEPTED)
 async def upload_document(
     request: Request,
@@ -76,21 +121,11 @@ async def upload_document(
         window_seconds=3600,
     )
 
-    payload = await file.read()
-    if not payload:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "ไฟล์ว่าง")
-
     limit = settings.max_upload_mb * 1024 * 1024
-    if len(payload) > limit:
-        raise HTTPException(
-            status.HTTP_413_CONTENT_TOO_LARGE,
-            f"ไฟล์ใหญ่เกิน {settings.max_upload_mb} MB",
-        )
-
-    mime = _detect_mime(payload[:4096], file.filename or "")
     document_id = uuid.uuid4()
     path = _storage_path(user.id, document_id, file.filename or "upload")
-    path.write_bytes(payload)
+    head, size_bytes = await save_upload_within_limit(file, path, limit)
+    mime = _detect_mime(head, file.filename or "")
 
     try:
         # นับหน้า *ก่อน* เข้าคิว — ถ้ารอนับหลัง OCR user จะเผา GPU ไปเป็นชั่วโมง
@@ -107,7 +142,7 @@ async def upload_document(
         filename=file.filename or "upload",
         mime_type=mime,
         storage_path=str(path),
-        size_bytes=len(payload),
+        size_bytes=size_bytes,
         collection=collection,
         status="pending",
         page_count=estimate.pages,

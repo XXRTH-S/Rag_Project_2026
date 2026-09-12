@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from collections.abc import AsyncIterator
 
@@ -14,17 +15,19 @@ from app.core.deps import get_current_user
 from app.llm import orchestrator
 from app.models.chat import ChatMessage, Feedback
 from app.models.user import User
+from app.schemas.base import StrictModel
 
 router = APIRouter(prefix="/api", tags=["chat"])
+log = logging.getLogger("app.chat")
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(StrictModel):
     message: str = Field(min_length=1, max_length=4000)
     session_id: uuid.UUID | None = None
     collection: str | None = None
 
 
-class FeedbackRequest(BaseModel):
+class FeedbackRequest(StrictModel):
     message_id: uuid.UUID
     rating: int = Field(ge=-1, le=1)
     comment: str | None = Field(default=None, max_length=2000)
@@ -74,8 +77,18 @@ async def chat(
                 collection=payload.collection,
             ):
                 yield _sse(event, data)
-        except Exception as exc:  # noqa: BLE001
-            yield _sse("error", {"detail": f"{type(exc).__name__}: {exc}"})
+        except Exception:  # noqa: BLE001
+            # ข้อความ exception ดิบมีทั้งชื่อโฮสต์ พอร์ต และ path ของไฟล์ในเครื่อง
+            # (error ของ asyncpg/httpx มีครบ) ส่งออกไปเท่ากับแจกผังระบบให้คนนอก
+            #
+            # log ตัวเต็มไว้ข้างในพร้อม reference แล้วส่งออกแค่รหัสนั้น
+            # ผู้ใช้แจ้งรหัสมา เราหาใน log เจอทันทีโดยไม่ต้องเปิดรายละเอียดให้ใคร
+            reference = uuid.uuid4().hex[:8]
+            log.exception("chat stream ล้มเหลว ref=%s session=%s", reference, chat_session.id)
+            yield _sse(
+                "error",
+                {"detail": f"ระบบขัดข้องระหว่างตอบคำถาม (รหัสอ้างอิง {reference})"},
+            )
 
     return StreamingResponse(
         event_stream(),

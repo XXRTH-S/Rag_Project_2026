@@ -68,6 +68,8 @@ export type Quota = {
   pages: QuotaBucket;
   unlimited: boolean;
   resets_at: string;
+  /** เพดานขนาดไฟล์จากเซิร์ฟเวอร์ ไม่ตั้งเองฝั่งเว็บเพื่อไม่ให้สองฝั่งเพี้ยนกัน */
+  max_upload_bytes: number;
 };
 
 export type DocumentOut = {

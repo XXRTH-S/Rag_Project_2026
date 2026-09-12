@@ -35,7 +35,7 @@ export default function LoginPage() {
       <p className="sub">ใช้บัญชี admin ที่ตั้งไว้ใน .env หรือบัญชีที่ admin สร้างให้</p>
 
       <form onSubmit={submit} className="card">
-        {error && <div className="alert">{error}</div>}
+        {error && <div className="alert" role="alert">{error}</div>}
 
         <div className="field">
           <label htmlFor="email">อีเมล</label>

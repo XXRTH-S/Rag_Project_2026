@@ -123,7 +123,7 @@ if sid:
 print("=== 4. quota ของ user ธรรมดา ===")
 uemail = f"qa-{uuid.uuid4().hex[:8]}@example.com"
 cr = httpx.post(f"{BASE}/api/admin/users", headers=admin,
-                json={"email": uemail, "password": "TestPass123!", "is_admin": False}, timeout=60)
+                json={"email": uemail, "password": "TestPass123!", "role": "user"}, timeout=60)
 check("สร้าง user ได้", cr.status_code in (200, 201), f"{cr.status_code} {cr.text[:150]}")
 uid = cr.json().get("id") if cr.status_code in (200, 201) else None
 if uid:

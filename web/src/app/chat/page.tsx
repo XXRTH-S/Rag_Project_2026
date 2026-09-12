@@ -297,7 +297,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
       <h1>แชท</h1>
       <p className="sub">ตอบจากเอกสารที่อยู่ในคลังเท่านั้น พร้อมอ้างอิงที่มาทุกครั้ง</p>
 
-      {error && <div className="alert">{error}</div>}
+      {error && <div className="alert" role="alert">{error}</div>}
 
       <div className="chat-layout">
         <aside className="session-pane">

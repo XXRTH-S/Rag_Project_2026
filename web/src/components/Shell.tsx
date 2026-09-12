@@ -31,7 +31,7 @@ export function Shell({
       <>
         <Nav user={null} />
         <main>
-          <div className="alert">
+          <div className="alert" role="alert">
             ต่อ API ไม่ได้ ตรวจว่า backend ทำงานอยู่ด้วย <code>.\dc.ps1 logs -f api</code>
           </div>
         </main>

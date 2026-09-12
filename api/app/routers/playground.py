@@ -6,22 +6,25 @@
 """
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import ratelimit
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import require_admin
 from app.llm import orchestrator
 from app.llm.prompts import DEFAULT_SYSTEM_PROMPT
 from app.models.chat import PromptConfig
 from app.models.user import User
+from app.schemas.base import StrictModel
 
 router = APIRouter(prefix="/api/admin", tags=["playground"])
 
 
-class PlaygroundQuery(BaseModel):
+class PlaygroundQuery(StrictModel):
     message: str = Field(min_length=1, max_length=4000)
     collection: str | None = None
     top_k: int | None = Field(default=None, ge=1, le=50)
@@ -34,7 +37,7 @@ class PlaygroundQuery(BaseModel):
     call_llm: bool = True
 
 
-class PromptConfigIn(BaseModel):
+class PromptConfigIn(StrictModel):
     name: str = Field(min_length=1, max_length=128)
     system_prompt: str = Field(min_length=1)
     top_k: int = Field(default=8, ge=1, le=50)
@@ -53,9 +56,19 @@ class PromptConfigOut(PromptConfigIn):
 @router.post("/playground/query")
 async def playground_query(
     payload: PlaygroundQuery,
+    request: Request,
     admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    # เรียกโมเดลเหมือน /api/chat ทุกประการ ถ้าไม่คุมตรงนี้ เพดานของแชทก็ไร้ความหมาย
+    # เพราะยิงทาง playground แทนได้ · การ์ดใบเดียวตอบได้ทีละคำขอ ยิงรัวคือล็อกคิวทุกคน
+    await ratelimit.enforce(
+        request,
+        scope="playground",
+        limit=settings.rate_limit_playground_per_minute,
+        window_seconds=60,
+    )
+
     hits = await orchestrator.retrieve(
         session,
         payload.message,

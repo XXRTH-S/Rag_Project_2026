@@ -111,16 +111,66 @@ function DocumentsInner() {
     }
   }, []);
 
+  const hasActiveWork = documents.some((d) => ACTIVE_STATES.has(d.status));
+
+  // ยิงถี่เฉพาะตอนมีงานกำลังประมวลผลจริง
+  //
+  // เดิมยิงทุก 5 วินาทีตลอดเวลา แม้ไม่มีงานค้างและแม้ผู้ใช้ย่อแท็บทิ้งไว้
+  // แต่ละรอบคือ 2 request บวกอีก 1 ต่อเอกสารที่ยังไม่เสร็จ — เปิดค้างไว้
+  // ทั้งวันก็กินเครื่องฟรี ๆ ทั้งที่หน้าจอไม่มีอะไรเปลี่ยน และเครื่องนี้
+  // ต้องเอาแรงไปให้ OCR กับ LLM
   useEffect(() => {
     refresh();
-    const timer = setInterval(refresh, 5000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+
+    // ไม่มีงานค้าง = ไม่ต้องถามซ้ำ ผู้ใช้กดอัปโหลดเมื่อไหร่ refresh ถูกเรียกเองอยู่แล้ว
+    if (!hasActiveWork) return;
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      if (timer === null) timer = setInterval(refresh, 5000);
+    };
+    const stop = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    // แท็บที่ถูกซ่อนไม่มีใครดู แต่ยังกินเครื่องเท่าเดิมถ้าไม่หยุด
+    // กลับมาดูเมื่อไหร่ก็ refresh ทันทีหนึ่งครั้ง ไม่ต้องรอครบรอบ
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        refresh();
+        start();
+      }
+    };
+
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [refresh, hasActiveWork]);
 
   async function upload(event: React.FormEvent) {
     event.preventDefault();
     const file = fileInput.current?.files?.[0];
     if (!file) return;
+
+    // บอกตั้งแต่ก่อนส่ง ไม่ใช่ให้รออัปจนจบแล้วค่อยเจอ 413
+    // ไฟล์ 200 MB บนเน็ตบ้านคือรอหลายนาทีเพื่อไปเจอ error ที่รู้ได้ตั้งแต่แรก
+    const maxBytes = quota?.max_upload_bytes;
+    if (maxBytes && file.size > maxBytes) {
+      setError(
+        `ไฟล์ใหญ่ ${formatBytes(file.size)} เกินเพดาน ${formatBytes(maxBytes)} ที่ระบบรับได้`,
+      );
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -181,8 +231,8 @@ function DocumentsInner() {
       <QuotaCard quota={quota} />
 
       <form className="card" onSubmit={upload}>
-        {error && <div className="alert">{error}</div>}
-        {notice && <div className="alert info">{notice}</div>}
+        {error && <div className="alert" role="alert">{error}</div>}
+        {notice && <div className="alert info" role="status">{notice}</div>}
 
         <div className="field">
           <label htmlFor="file">เลือกไฟล์ (PDF, รูปภาพ, docx, txt, html)</label>

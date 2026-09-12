@@ -52,11 +52,22 @@ async def lifespan(app: FastAPI):
     yield
 
 
+# /docs กับ /openapi.json เปิดสาธารณะตามค่าเริ่มต้นของ FastAPI ซึ่งเท่ากับแจกผัง
+# ของทั้ง API ให้คนที่ยังไม่ได้ล็อกอิน รวมถึงชื่อ endpoint ฝั่ง admin และรูปร่าง payload
+# ทั้งหมด — เป็นแผนที่ชั้นดีให้คนที่จะลองโจมตี
+#
+# ยังเปิดไว้ตอน dev เพราะจำเป็นกับการต่อ frontend แต่ต้องปิดเมื่อขึ้นใช้จริง
+# คุมด้วย API_DOCS_ENABLED ใน .env ไม่ผูกกับ tier เพราะ tier บอกเรื่องโมเดล ไม่ใช่เรื่องความปลอดภัย
+_docs_enabled = settings.api_docs_enabled
+
 app = FastAPI(
     title="RAG Workshop API",
     version="0.1.0",
     description="Retrieval + LLM orchestration + ingestion/OCR",
     lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 app.add_middleware(

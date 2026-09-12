@@ -94,8 +94,8 @@ function UsersInner({ me }: { me: Me }) {
         ระบบไม่มีหน้าสมัครสมาชิกสาธารณะ — คลังความรู้เป็นเอกสารภายใน บัญชีต้องสร้างโดย admin
       </p>
 
-      {error && <div className="alert">{error}</div>}
-      {notice && <div className="alert info">{notice}</div>}
+      {error && <div className="alert" role="alert">{error}</div>}
+      {notice && <div className="alert info" role="status">{notice}</div>}
 
       <form className="card" onSubmit={create}>
         <div className="grid">

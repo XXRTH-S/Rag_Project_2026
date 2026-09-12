@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import get_current_user
 from app.models.user import User
@@ -17,4 +18,7 @@ async def my_quota(
 ) -> dict:
     """หน้า UI ต้องเรียกอันนี้ก่อน user เลือกไฟล์ ไม่ใช่ไปเด้ง 429 ทีหลัง"""
     status = await service.get_status(session, user)
-    return status.to_dict()
+    return {
+        **status.to_dict(),
+        "max_upload_bytes": settings.max_upload_mb * 1024 * 1024,
+    }

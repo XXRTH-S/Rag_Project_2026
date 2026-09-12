@@ -136,6 +136,10 @@ class Settings(BaseSettings):
     # False สำหรับ http://localhost ตอน dev — ต้องตั้งเป็น true เมื่อเปิด HTTPS จริง
     # ไม่งั้น browser จะส่ง cookie ผ่าน http ธรรมดาได้
     cookie_secure: bool = False
+    # /docs /redoc /openapi.json — เปิดไว้ตอน dev เพราะจำเป็นกับการต่อ frontend
+    # ต้องปิดเมื่อขึ้นใช้จริง ไม่งั้นเท่ากับแจกผังของทั้ง API รวมถึง endpoint ฝั่ง admin
+    # ให้คนที่ยังไม่ได้ล็อกอิน
+    api_docs_enabled: bool = True
 
     # ---------- บุคลิกของผู้ช่วย ----------
     # คำลงท้ายสุภาพภาษาไทย — "ครับ" หรือ "ค่ะ" แล้วแต่บุคลิกที่องค์กรเลือก
@@ -155,6 +159,16 @@ class Settings(BaseSettings):
     # คุม "ความถี่" ต่างจากโควตาที่คุม "ปริมาณต่อวัน" — แชทไม่กินโควตาแต่กิน GPU ทุกครั้ง
     rate_limit_chat_per_minute: int = 20
     rate_limit_upload_per_hour: int = 60
+    # กันการเดารหัสผ่าน · 10 ครั้งต่อ 5 นาที = ราว 2,900 ครั้งต่อวันจาก IP เดียว
+    # ซึ่งน้อยเกินกว่าจะไล่เดารหัสที่ยาวพอได้ แต่เผื่อให้คนพิมพ์ผิดหลายรอบได้สบาย ๆ
+    #
+    # จงใจนับต่อ IP ไม่ใช่ต่ออีเมล — ถ้านับต่ออีเมล ใครก็ยิงรหัสผิดใส่อีเมลของ
+    # คนอื่นจนบัญชีเขาเข้าไม่ได้ กลายเป็นเปิดช่องกลั่นแกล้งแทนที่จะปิดช่องโจมตี
+    rate_limit_login_attempts: int = 10
+    rate_limit_login_window_seconds: int = 300
+    # playground เรียกโมเดลเหมือน /api/chat ทุกประการ ถ้าไม่คุมก็เลี่ยงเพดานของแชท
+    # ได้ด้วยการยิงทาง playground แทน · ตั้งต่ำกว่าเพราะเป็นเครื่องมือทดลอง ไม่ใช่ทางใช้งานหลัก
+    rate_limit_playground_per_minute: int = 10
     # เชื่อ X-Forwarded-For เฉพาะเมื่ออยู่หลัง Caddy ของเราเอง
     # ถ้าเปิด API ตรงออกอินเทอร์เน็ต ต้องเป็น false ไม่งั้นใครก็ปลอม IP เลี่ยง rate limit ได้
     trust_proxy_headers: bool = True

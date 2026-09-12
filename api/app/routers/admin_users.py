@@ -10,32 +10,52 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_admin
-from app.core.security import hash_password
+from app.core.security import MAX_PASSWORD_BYTES, hash_password, password_too_long
 from app.models.user import User
 from app.quota import service as quota_service
 from app.schemas.auth import UserOut
+from app.schemas.base import StrictModel
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
 
 MIN_PASSWORD_LENGTH = 8
 
 
-class UserCreate(BaseModel):
+def _check_password_length(value: str | None) -> str | None:
+    """กันรหัสผ่านที่ยาวเกินที่ bcrypt รับไหว
+
+    เพดานของ bcrypt นับเป็น **ไบต์** ไม่ใช่ตัวอักษร อักษรไทยกินตัวละ 3 ไบต์
+    รหัสภาษาไทยแค่ 25 ตัวจึงเกิน 72 ไบต์แล้ว และ bcrypt โยน ValueError ออกมาดิบ ๆ
+    ซึ่งกลายเป็น 500 ให้ admin เห็น แทนที่จะบอกว่า "รหัสยาวเกินไป"
+    """
+    if value is not None and password_too_long(value):
+        raise ValueError(
+            f"รหัสผ่านยาวเกินที่ระบบรองรับ (สูงสุด {MAX_PASSWORD_BYTES} ไบต์ "
+            f"ประมาณ {MAX_PASSWORD_BYTES // 3} ตัวอักษรไทย หรือ {MAX_PASSWORD_BYTES} ตัวอักษรอังกฤษ)"
+        )
+    return value
+
+
+class UserCreate(StrictModel):
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=256)
     role: str = Field(default="user", pattern="^(user|admin)$")
 
+    _validate_password = field_validator("password")(_check_password_length)
 
-class UserUpdate(BaseModel):
+
+class UserUpdate(StrictModel):
     password: str | None = Field(default=None, min_length=MIN_PASSWORD_LENGTH, max_length=256)
     role: str | None = Field(default=None, pattern="^(user|admin)$")
     is_active: bool | None = None
+
+    _validate_password = field_validator("password")(_check_password_length)
 
 
 class UserWithUsage(UserOut):

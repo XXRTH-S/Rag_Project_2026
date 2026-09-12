@@ -101,7 +101,7 @@ function PlaygroundInner() {
         คืน chunk ดิบพร้อมคะแนน เพื่อแยกให้ออกว่าคำตอบผิดเพราะ retrieval หาไม่เจอ หรือเจอแล้วแต่โมเดลตอบเพี้ยน
       </p>
 
-      {error && <div className="alert">{error}</div>}
+      {error && <div className="alert" role="alert">{error}</div>}
 
       <form className="card" onSubmit={run}>
         <div className="field">

@@ -58,7 +58,7 @@ export default function StatusPage() {
         </p>
 
         {error && (
-          <div className="alert">
+          <div className="alert" role="alert">
             ต่อ API ไม่ได้: {error}
             <div className="detail">
               ตรวจว่า api container ทำงานอยู่ด้วย <code>.\dc.ps1 logs -f api</code>

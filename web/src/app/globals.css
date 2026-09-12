@@ -223,6 +223,20 @@ select:focus {
   outline-offset: -1px;
 }
 
+/* ปุ่มกับลิงก์ก็ต้องเห็นโฟกัส ไม่ใช่เฉพาะช่องกรอก
+   เดิมมีแค่ input/textarea/select คนที่ใช้คีย์บอร์ด (หรือเมาส์เสีย) จึงกด Tab
+   ไล่ไปทั้งหน้าโดยไม่รู้เลยว่าตอนนี้อยู่ที่ปุ่มไหน
+
+   ใช้ :focus-visible ไม่ใช่ :focus เพื่อไม่ให้ขอบเด้งขึ้นมาตอนคลิกเมาส์
+   ซึ่งเป็นเหตุผลที่หลายโปรเจกต์ไปปิด outline ทิ้งแล้วพัง a11y ไปเลย */
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .field {
   margin-bottom: 0.9rem;
 }

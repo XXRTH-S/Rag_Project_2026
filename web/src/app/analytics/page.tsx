@@ -114,7 +114,7 @@ function AnalyticsInner() {
         </select>
       </div>
 
-      {error && <div className="alert">{error}</div>}
+      {error && <div className="alert" role="alert">{error}</div>}
 
       {overview && (
         <>

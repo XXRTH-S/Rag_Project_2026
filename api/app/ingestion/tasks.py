@@ -23,11 +23,27 @@ from app.llm import ollama_admin
 from app.models.document import Chunk, Document, IngestionJob
 from app.models.user import User
 from app.quota import service as quota_service
-from app.quota.page_count import PDF_MIMES
+from app.quota.page_count import PDF_MIMES, UnsupportedFileType
 from app.retrieval.keywords import to_search_text
 from app.worker import celery_app
 
 log = logging.getLogger("app.ingestion")
+
+
+# ข้อผิดพลาดที่เราเขียนข้อความเองและตั้งใจให้ผู้ใช้อ่าน — ปลอดภัยที่จะส่งต่อตรง ๆ
+# ตัวอื่นทั้งหมดถือว่าอาจมีรายละเอียดภายในปนอยู่ จึงไม่ส่งออก
+_USER_FACING_ERRORS = (UnsupportedFileType,)
+
+
+def _safe_error_message(exc: Exception, reference: str) -> str:
+    """ข้อความที่ปลอดภัยพอจะโชว์บนหน้าเว็บของผู้ใช้
+
+    ผู้ใช้ต้องรู้ว่าทำอะไรต่อได้ ("ไฟล์ชนิดนี้ยังไม่รองรับ" แก้เองได้ทันที)
+    แต่ไม่ต้องรู้ว่า database อยู่โฮสต์ไหนหรือไฟล์ถูกเก็บที่ path ใด
+    """
+    if isinstance(exc, _USER_FACING_ERRORS):
+        return str(exc)[:2000]
+    return f"ประมวลผลไม่สำเร็จเนื่องจากข้อผิดพลาดภายในระบบ (รหัสอ้างอิง {reference})"
 
 
 async def _set_stage(
@@ -192,13 +208,18 @@ async def _run(job_id: uuid.UUID, task_type: str | None = None, session_factory=
             }
 
         except Exception as exc:  # noqa: BLE001
-            log.exception("ingestion ล้มเหลว job=%s", job_id)
+            # ข้อความนี้ถูกเก็บลง DB แล้วโชว์บนหน้า Documents ของผู้ใช้
+            # exception ดิบของ asyncpg/httpx มีชื่อโฮสต์ พอร์ต และ path ในเครื่องติดมาด้วย
+            # จึงแยกสองทาง: ข้อผิดพลาดที่เราตั้งใจให้ผู้ใช้อ่าน (เช่นไฟล์ไม่รองรับ)
+            # ส่งข้อความจริง ส่วนที่เหลือส่งแค่รหัสอ้างอิงไว้ตามหาใน log
+            reference = uuid.uuid4().hex[:8]
+            log.exception("ingestion ล้มเหลว job=%s ref=%s", job_id, reference)
             await session.rollback()
 
             job = await session.get(IngestionJob, job_id)
             document = await session.get(Document, job.document_id) if job else None
             if job is not None:
-                job.error = f"{type(exc).__name__}: {exc}"[:2000]
+                job.error = _safe_error_message(exc, reference)
                 job.finished_at = datetime.now(UTC)
                 job.stage = "failed"
             if document is not None:
