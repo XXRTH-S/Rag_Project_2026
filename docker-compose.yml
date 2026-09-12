@@ -1,0 +1,142 @@
+name: rag-workshop
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ตั้ง POSTGRES_PASSWORD ใน .env ก่อน}
+      POSTGRES_DB: ${POSTGRES_DB:-rag}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rag} -d ${POSTGRES_DB:-rag}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # bge-m3 บน CPU — GPU 6GB ต้องสงวนไว้ให้ Ollama ทั้งหมด
+  #
+  # pin ด้วย digest ไม่ใช่ tag: cpu-1.5 (hf-hub 0.3.2) โหลด bge-m3 ไม่ได้เลย
+  # ล้มด้วย "relative URL without a base" เพราะ parse relative redirect ของ HF CDN ไม่ได้
+  # digest นี้คือ cpu-latest ณ วันที่ตรวจ = text-embeddings-router 1.9.3
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference@sha256:cb570aabbfa016b86684f576b5bd72d1ee96cc0b7a00b0ad221b298762b32157
+    # ค่า default ของ TEI (max-batch-tokens 16384, tokenization workers = จำนวน CPU)
+    # ทำให้ขั้น "Warming up model" ถูก SIGKILL (exit 137) บน WSL VM ที่มี RAM 8GB
+    # bge-m3 ONNX กิน ~2.5GB อยู่แล้ว การ warmup ด้วย batch 16k token ดันทะลุเพดาน
+    # 4096 token/batch พอสำหรับ chunk ขนาด ~800 ตัวอักษรของเรา (ราว 300 token/chunk)
+    command:
+      - --model-id
+      - BAAI/bge-m3
+      - --port
+      - "8080"
+      - --auto-truncate
+      - --max-batch-tokens
+      - "4096"
+      - --max-client-batch-size
+      - "16"
+      - --tokenization-workers
+      - "2"
+    # ไม่ตั้ง HF_TOKEN: bge-m3 เป็น public model และ HF_TOKEN ที่เป็นสตริงว่าง
+    # ทำให้ hf-hub ใน TEI พังด้วย "relative URL without a base"
+    # ถ้าวันหลังต้องใช้โมเดล gated ค่อยเพิ่ม environment: {HF_TOKEN: "${HF_TOKEN}"} กลับมา
+    volumes:
+      - hf-cache:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      # ครั้งแรกต้องโหลด ONNX weights ของ bge-m3 ~2.2GB ซึ่งใช้เวลาเป็นสิบนาที
+      # ตั้งสั้นกว่านี้จะขึ้น unhealthy ทั้งที่กำลังทำงานปกติ
+      start_period: 900s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./api
+    env_file: [.env]
+    environment:
+      UPLOAD_DIR: /data/uploads
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # concurrency=1 คือข้อบังคับ ไม่ใช่การจูน — GPU 6GB รับงาน OCR ได้ทีละหน้าเท่านั้น
+  worker:
+    build:
+      context: ./api
+    env_file: [.env]
+    environment:
+      UPLOAD_DIR: /data/uploads
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    volumes:
+      - uploads:/data/uploads
+    command:
+      - celery
+      - -A
+      - app.worker.celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=1
+      - -Q
+      - ocr_admin,ocr_user,default
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+    environment:
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    depends_on: [api]
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on: [api, web]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  hf-cache:
+  uploads:
+  caddy-data:
+  caddy-config:

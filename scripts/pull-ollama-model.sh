@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# ดึงโมเดลจาก Ollama registry พร้อมตัวจับอาการค้าง
+#
+# ทำไมต้องมี watchdog:
+#   `ollama pull` ค้างเงียบ ๆ ได้ไม่จำกัดเวลาเมื่อการเชื่อมต่อตาย — ไม่ error ไม่ timeout
+#   เจอมาแล้ว: หยุดนิ่งที่ 585 MB นาน 90 นาทีโดยไม่มีอะไรบอก เสียเวลาฟรี
+#   ตัว timeout ของ shell ช่วยไม่พอเพราะกว่าจะครบก็เสียเวลาไปมากแล้ว
+#
+# วิธีทำงาน: เฝ้าขนาด blob ถ้าไม่โตขึ้นภายใน STALL_LIMIT วินาที ให้ฆ่า pull
+# แล้ว restart ollama (ตัด pull ฝั่ง server ที่ค้าง) จากนั้นเริ่มใหม่
+# ความคืบหน้าไม่หายเพราะตั้ง OLLAMA_NOPRUNE=1 ไว้ใน docker-compose.local.yml
+#
+# ใช้: bash scripts/pull-ollama-model.sh qwen3.5:4b [ชื่อ alias]
+
+set -u
+
+MODEL="${1:?ต้องระบุชื่อโมเดล}"
+ALIAS="${2:-}"
+STALL_LIMIT="${STALL_LIMIT:-300}"
+CHECK_EVERY="${CHECK_EVERY:-60}"
+MAX_ATTEMPTS="${MAX_ATTEMPTS:-100}"
+
+cd "$(dirname "$0")/.." || exit 1
+DC="docker compose -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.override.yml"
+
+blob_mb() {
+  $DC exec -T ollama du -sm /root/.ollama/models/blobs 2>/dev/null | cut -f1 | tr -d '[:space:]'
+}
+
+model_present() {
+  $DC exec -T ollama ollama list 2>/dev/null | grep -q "^${MODEL%%:*}"
+}
+
+if model_present; then
+  echo "[skip] มี $MODEL อยู่แล้ว"
+  exit 0
+fi
+
+for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+  echo "[$(date '+%H:%M:%S')] เริ่ม pull $MODEL (รอบ $attempt)"
+
+  $DC exec -T ollama ollama pull "$MODEL" >/dev/null 2>&1 &
+  pull_pid=$!
+
+  last=$(blob_mb); last=${last:-0}
+  last_change=$(date +%s)
+
+  while kill -0 "$pull_pid" 2>/dev/null; do
+    sleep "$CHECK_EVERY"
+    current=$(blob_mb); current=${current:-$last}
+    now=$(date +%s)
+
+    if [ "$current" -gt "$last" ]; then
+      elapsed=$((now - last_change))
+      [ "$elapsed" -lt 1 ] && elapsed=1
+      echo "[$(date '+%H:%M:%S')] ${current} MB (+$((current - last)) MB · $(((current - last) * 1024 / elapsed)) KB/s)"
+      last=$current
+      last_change=$now
+    elif [ $((now - last_change)) -ge "$STALL_LIMIT" ]; then
+      echo "[$(date '+%H:%M:%S')] ค้างมา $((now - last_change)) วินาที — ฆ่าแล้วเริ่มใหม่"
+      kill -9 "$pull_pid" 2>/dev/null
+      # restart เพื่อตัด pull ฝั่ง server ที่ยังค้าง ไม่งั้นรอบใหม่จะแย่งกันเอง
+      $DC restart ollama >/dev/null 2>&1
+      sleep 5
+      break
+    fi
+  done
+
+  wait "$pull_pid" 2>/dev/null
+
+  if model_present; then
+    [ -n "$ALIAS" ] && $DC exec -T ollama ollama cp "$MODEL" "$ALIAS" >/dev/null 2>&1
+    echo "================ RESULT ================"
+    echo "MODEL_READY $MODEL"
+    $DC exec -T ollama ollama list
+    exit 0
+  fi
+
+  sleep 10
+done
+
+echo "================ RESULT ================"
+echo "MODEL_FAILED $MODEL"
+exit 1

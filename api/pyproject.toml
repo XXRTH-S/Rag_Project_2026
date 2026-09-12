@@ -1,0 +1,50 @@
+[project]
+name = "rag-workshop-api"
+version = "0.1.0"
+description = "RAG chatbot backend — retrieval + LLM orchestration + ingestion/OCR"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pgvector>=0.3.6",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "celery[redis]>=5.4",
+    "redis>=5.2",
+    "httpx>=0.27",
+    "python-multipart>=0.0.12",
+    # ใช้ bcrypt ตรง ๆ ไม่ผ่าน passlib — passlib 1.7.4 พังกับ bcrypt >= 4.1
+    "bcrypt>=4.2",
+    "pyjwt>=2.9",
+    "python-magic>=0.4.27",
+    "pypdf>=5.1",
+    "pillow>=11.0",
+    "pythainlp>=5.0",
+    "structlog>=24.4",
+    "tenacity>=9.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.8"]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Dockerfile ติดตั้ง deps ตั้งแต่ยังไม่มีโค้ด (เพื่อ layer cache) ตัว app จึงไม่อยู่ใน
+# site-packages แต่ถูกใช้จาก WORKDIR แทน — pytest ต้องได้ rootdir เข้า sys.path ด้วย
+pythonpath = ["."]
+testpaths = ["tests"]

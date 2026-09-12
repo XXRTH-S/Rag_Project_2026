@@ -1,0 +1,16 @@
+# โค้ดทั้งหมดรันใน container ลินุกซ์ ต้องเก็บและ checkout เป็น LF
+# ถ้าปล่อยให้ git แปลงเป็น CRLF ตามค่าเริ่มต้นของวินโดวส์ สคริปต์ .sh จะพัง
+# ด้วย error ที่อ่านไม่ออกอย่าง "bad interpreter: /bin/bash^M"
+* text=auto eol=lf
+
+# ยกเว้นสคริปต์ที่รันบนวินโดวส์จริง ๆ — PowerShell 5.1 ต้องการ CRLF
+*.ps1 text eol=crlf
+
+# ไฟล์ไบนารีห้ามแตะ
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.ttf binary
+*.woff binary
+*.woff2 binary

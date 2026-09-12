@@ -1,0 +1,35 @@
+{
+	# ใช้ในวงแลน/เครื่องเดียว ไม่ต้องขอ cert จริง
+	# ถ้าเปิดออกอินเทอร์เน็ต: ลบบรรทัดนี้ เปลี่ยน :80 เป็นชื่อโดเมน แล้ว Caddy จะขอ TLS ให้เอง
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	# health อยู่นอก /api ตามสเปกของ orchestrator ทั่วไป (k8s, docker healthcheck)
+	# ถ้าไม่ route ไว้ที่นี่ monitor ภายนอกที่ยิงพอร์ต 80 จะไปโดนหน้าเว็บแล้วได้ 404
+	handle /health* {
+		reverse_proxy api:8000
+	}
+
+	# SSE ของ /api/chat ต้องไม่ถูก buffer ไม่งั้น token จะมาเป็นก้อนเดียวตอนจบ
+	handle /api/* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+		}
+	}
+
+	handle /widget.js {
+		reverse_proxy web:3000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

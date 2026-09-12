@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ตัวอย่างการฝัง chat widget</title>
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, "Segoe UI", "Noto Sans Thai", sans-serif;
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 3rem 1.5rem;
+        line-height: 1.7;
+        color: #18181b;
+      }
+      pre {
+        background: #f4f4f5;
+        padding: 0.9rem 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-size: 0.85rem;
+      }
+      .note {
+        border-left: 3px solid #4f46e5;
+        padding-left: 1rem;
+        color: #52525b;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #09090b; color: #fafafa; }
+        pre { background: #1c1c20; }
+        .note { color: #a1a1aa; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ตัวอย่างการฝัง chat widget</h1>
+    <p>หน้านี้จำลองเว็บของลูกค้าที่ฝัง widget ไว้ ปุ่มคุยอยู่มุมขวาล่าง</p>
+
+    <h2>วิธีฝัง</h2>
+    <pre>&lt;script src="http://localhost/widget.js" defer&gt;&lt;/script&gt;</pre>
+
+    <p>ถ้า widget อยู่คนละโดเมนกับ API ให้ระบุปลายทางด้วย</p>
+    <pre>&lt;script src="https://rag.example.com/widget.js"
+        data-api="https://rag.example.com" defer&gt;&lt;/script&gt;</pre>
+
+    <h2 class="note">ข้อควรรู้</h2>
+    <p class="note">
+      ตอนนี้ <code>/api/chat</code> ต้องเข้าสู่ระบบก่อน widget จึงใช้ได้เฉพาะผู้ที่ล็อกอินแล้ว
+      ในเบราว์เซอร์เดียวกัน ถ้าต้องการเปิดให้คนทั่วไปใช้โดยไม่ต้องล็อกอิน
+      ต้องเพิ่ม endpoint สาธารณะที่จำกัดขอบเขตเอกสารและพึ่ง rate limit กับ origin allowlist
+      เป็นด่านป้องกัน ซึ่งเป็นการตัดสินใจด้านความปลอดภัยที่ต้องพิจารณาก่อน
+    </p>
+
+    <script src="/widget.js" defer></script>
+  </body>
+</html>

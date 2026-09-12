@@ -1,0 +1,41 @@
+[
+  { "question": "Python แทรกค่าตัวแปรลงในข้อความอย่างไร", "expect": "f-string" },
+  { "question": "เปิดไฟล์ใน Python แบบไหนที่ปิดไฟล์ให้เอง", "expect": "with open()" },
+  { "question": "ดึงค่าจากดิกชันนารีโดยไม่ให้พังต้องทำอย่างไร", "expect": "KeyError" },
+  { "question": "list comprehension คืออะไร", "expect": "comprehension" },
+
+  { "question": "arrow function ใน JavaScript ต่างจากฟังก์ชันปกติอย่างไร", "expect": "arrow function" },
+  { "question": "await ใช้กับอะไร", "expect": "Promise" },
+  { "question": "reduce ใน JavaScript ทำอะไร", "expect": "reduce" },
+  { "question": "ทำไม fetch ไม่ throw error ตอนได้ 404", "expect": "response.ok" },
+
+  { "question": "ทำไม Java ต้องเทียบข้อความด้วย equals", "expect": "equals()" },
+  { "question": "Java คอมไพล์เป็นอะไร", "expect": "bytecode" },
+  { "question": "encapsulation คืออะไร", "expect": "encapsulation" },
+  { "question": "ArrayList ต่างจากอาร์เรย์อย่างไร", "expect": "ArrayList" },
+
+  { "question": "จองหน่วยความจำในภาษา C ใช้คำสั่งอะไร", "expect": "malloc" },
+  { "question": "buffer overflow เกิดขึ้นได้อย่างไร", "expect": "buffer overflow" },
+  { "question": "dangling pointer คืออะไร", "expect": "dangling pointer" },
+  { "question": "พอยน์เตอร์คืออะไร", "expect": "พอยน์เตอร์คือตัวแปรที่เก็บที่อยู่" },
+
+  { "question": "goroutine คืออะไร", "expect": "goroutine" },
+  { "question": "Go จัดการข้อผิดพลาดอย่างไร", "expect": "if err != nil" },
+  { "question": "แชนเนลใน Go ใช้ทำอะไร", "expect": "แชนเนล" },
+
+  { "question": "LEFT JOIN ต่างจาก INNER JOIN อย่างไร", "expect": "LEFT JOIN" },
+  { "question": "ป้องกัน SQL injection อย่างไร", "expect": "parameterized query" },
+  { "question": "HAVING ต่างจาก WHERE อย่างไร", "expect": "HAVING" },
+  { "question": "ดัชนีในฐานข้อมูลมีข้อเสียอะไรบ้าง", "expect": "ดัชนี" },
+
+  { "question": "Big-O คืออะไร", "expect": "Big-O" },
+  { "question": "infinite loop เกิดจากอะไร", "expect": "infinite loop" },
+  { "question": "logic error ต่างจาก syntax error อย่างไร", "expect": "logic error" },
+  { "question": "ภาษาไหนเป็น static typing บ้าง", "expect": "static typing" },
+
+  { "question": "Rust ประกาศตัวแปรอย่างไร", "expect_none": true },
+  { "question": "Kubernetes คืออะไร", "expect_none": true },
+  { "question": "วิธีติดตั้ง Docker บน Windows", "expect_none": true },
+  { "question": "เงินเดือนโปรแกรมเมอร์เริ่มต้นเท่าไหร่", "expect_none": true },
+  { "question": "React useState ใช้อย่างไร", "expect_none": true }
+]

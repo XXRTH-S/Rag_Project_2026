@@ -1,0 +1,13 @@
+# คัดลอกไปที่ C:\Users\PC\.wslconfig แล้วสั่ง `wsl --shutdown` หนึ่งครั้ง
+#
+#   Copy-Item wslconfig.example $env:USERPROFILE\.wslconfig
+#   wsl --shutdown
+#
+# เหตุผล: WSL2 ตั้ง default ที่ 50% ของ RAM เครื่อง (= 8.26 GB จาก 16 GB)
+# แต่ stack นี้ใช้ ~6-6.5 GB (TEI bge-m3 บน CPU ~2.5-3 GB เป็นก้อนใหญ่สุด)
+# ตั้ง 10 GB เหลือให้ Windows ~6 GB พอสำหรับ VSCode + browser
+
+[wsl2]
+memory=10GB
+processors=8
+swap=4GB

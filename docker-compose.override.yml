@@ -1,0 +1,38 @@
+# Dev only — hot reload. ข้ามไฟล์นี้ด้วย $env:RAG_ENV = 'prod'
+
+services:
+  api:
+    build:
+      target: dev
+    volumes:
+      - ./api:/app
+      - uploads:/data/uploads
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --reload
+
+  worker:
+    build:
+      target: dev
+    volumes:
+      - ./api:/app
+      - uploads:/data/uploads
+
+  web:
+    build:
+      target: dev
+    environment:
+      # bind mount จาก Windows เข้า WSL2 ไม่ส่ง inotify event ข้ามมา
+      # ถ้าไม่เปิด polling ไฟล์ที่เพิ่มใหม่จะไม่ถูกมองเห็นเลย (ได้ 404 ทุกหน้า)
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.next
+    command: ["npm", "run", "dev"]
