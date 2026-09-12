@@ -43,9 +43,41 @@ export default function StatusPage() {
         })
         .catch((e) => setError(String(e)));
 
+    // หยุดถามเมื่อไม่มีใครดูอยู่
+    //
+    // การเช็คหนึ่งครั้งไม่ได้ถูก — มันไล่ต่อ Postgres, Redis, TEI และถาม Ollama
+    // ว่าโมเดลไหนค้างอยู่ใน VRAM · เปิดแท็บนี้ทิ้งไว้ข้ามคืนคือยิงชุดนั้น
+    // แปดพันกว่ารอบโดยไม่มีใครอ่านผลเลย บนเครื่องที่ต้องเอาแรงไปให้ OCR กับ LLM
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      if (timer === null) timer = setInterval(load, 10_000);
+    };
+    const stop = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        // กลับมาดูแล้วต้องเห็นของสด ไม่ใช่ค่าค้างจากตอนที่สลับแท็บไป
+        load();
+        start();
+      }
+    };
+
     load();
-    const timer = setInterval(load, 10_000);
-    return () => clearInterval(timer);
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   return (
