@@ -25,3 +25,6 @@ Thumbs.db
 desktop.ini
 
 backups/
+
+# build artifact ของ tsc — เปลี่ยนทุกครั้งที่ typecheck ไม่ควรอยู่ในประวัติ
+*.tsbuildinfo
