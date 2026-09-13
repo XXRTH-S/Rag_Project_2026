@@ -6,10 +6,11 @@
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
     "next": "16.3.4",
@@ -20,6 +21,8 @@
     "@types/node": "^22.10.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.5",
     "typescript": "^5.7.3",
     "vitest": "^3.2.4"
   }

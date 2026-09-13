@@ -178,10 +178,10 @@ async def test_users_only_see_their_own_documents(
         files={"file": ("theirs.txt", b"content", "text/plain")},
     )
 
-    mine = (await client.get("/api/documents", headers=user_headers)).json()
+    mine = (await client.get("/api/documents", headers=user_headers)).json()["items"]
     assert [d["filename"] for d in mine] == ["mine.txt"]
 
-    all_docs = (await client.get("/api/documents", headers=admin_headers)).json()
+    all_docs = (await client.get("/api/documents", headers=admin_headers)).json()["items"]
     assert {d["filename"] for d in all_docs} == {"mine.txt", "theirs.txt"}
 
 

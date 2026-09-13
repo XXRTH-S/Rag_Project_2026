@@ -35,6 +35,9 @@ def render_pdf_page(pdf_path: Path, page_no: int, *, dpi: int = DEFAULT_DPI) -> 
                 str(prefix),
             ],
             capture_output=True,
+            # ไม่ให้โยน exception เอง เพราะเราอ่าน returncode แล้วสร้างข้อความ
+            # ที่บอกได้ว่าหน้าไหนของไฟล์ไหนที่พัง ซึ่งมีประโยชน์กว่า CalledProcessError เปล่า ๆ
+            check=False,
         )
         if result.returncode != 0:
             raise RenderError(

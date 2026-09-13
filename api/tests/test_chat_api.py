@@ -1,5 +1,6 @@
 import json
 import uuid
+from typing import ClassVar
 
 import pytest
 from httpx import AsyncClient
@@ -32,7 +33,8 @@ class FakeEmbeddingClient:
 
 class FakeChatClient:
     model_used = "fake-model"
-    calls: list[list[dict]] = []
+    # ClassVar เพราะตั้งใจให้แชร์ข้ามอินสแตนซ์ เทสอ่านย้อนได้ว่าถูกเรียกด้วยอะไร
+    calls: ClassVar[list[list[dict]]] = []
 
     def __init__(self, *args, **kwargs) -> None:
         pass

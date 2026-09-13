@@ -10,7 +10,7 @@ from app.ingestion.clean import (
 
 
 def test_soft_hyphen_and_zero_width_are_removed() -> None:
-    assert normalize_thai("ทด­สอบ​งาน") == "ทดสอบงาน"
+    assert normalize_thai("ทด­สอบ\u200bงาน") == "ทดสอบงาน"
 
 
 def test_inline_whitespace_collapses_but_paragraphs_survive() -> None:

@@ -10,6 +10,8 @@ pydantic ตั้งต้นด้วยการ **เมินเฉย** fi
 ใช้เฉพาะกับสิ่งที่ "รับเข้า" เท่านั้น · โมเดลที่ใช้ "ส่งออก" ไม่ต้องสืบทอดคลาสนี้
 เพราะมันแปลงมาจาก ORM ไม่ได้มาจากผู้ใช้
 """
+from typing import Generic, TypeVar
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -17,3 +19,22 @@ class StrictModel(BaseModel):
     """ปฏิเสธ field ที่ไม่รู้จักด้วย 422 แทนที่จะเมินเฉย"""
 
     model_config = ConfigDict(extra="forbid")
+
+
+T = TypeVar("T")
+
+
+class Page(BaseModel, Generic[T]):
+    """ผลลัพธ์แบบแบ่งหน้า
+
+    เดิม list endpoint คืน array เปล่า ๆ พร้อม limit ตายตัวที่ 50 แถว
+    ผู้ใช้ที่มีเอกสารมากกว่านั้นจะมองไม่เห็นของเก่า **และไม่มีอะไรบอกว่าถูกตัด**
+    ซึ่งแย่กว่าการเห็นไม่ครบ เพราะเข้าใจผิดว่านั่นคือทั้งหมดที่มี
+
+    total ทำให้หน้าเว็บบอกได้ว่า "แสดง 50 จาก 137" และรู้ว่ายังมีให้โหลดอีก
+    """
+
+    items: list[T]
+    total: int
+    limit: int
+    offset: int

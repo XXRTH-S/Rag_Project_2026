@@ -22,7 +22,7 @@ from app.quota import service as quota_service
 def run_job(engine):
     """เรียก pipeline โดยให้ใช้ฐานทดสอบ ไม่ใช่ฐานจริง"""
     factory = async_sessionmaker(engine, expire_on_commit=False)
-    return partial(tasks._run, session_factory=factory)  # noqa: SLF001
+    return partial(tasks._run, session_factory=factory)
 
 
 async def _prepare(
@@ -67,7 +67,7 @@ async def test_failure_marks_job_and_document(
 
 async def test_failure_before_gpu_refunds_quota(session: AsyncSession, user: User, run_job) -> None:
     """ยังไม่ได้แตะ GPU เลย ต้องคืนโควตาให้ครบ ไม่งั้น user เสียโควตาฟรีจากบั๊กของระบบ"""
-    document, job = await _prepare(session, user, pages=3)
+    _document, job = await _prepare(session, user, pages=3)
 
     before = await quota_service.get_status(session, user)
     assert before.documents_used == 1
@@ -84,7 +84,7 @@ async def test_failure_after_ocr_keeps_the_document_charge(
     session: AsyncSession, user: User, run_job
 ) -> None:
     """ถ้าเผา GPU ไปแล้วบางหน้า คืนเฉพาะหน้าที่เหลือ ไม่คืนสิทธิ์เอกสาร"""
-    document, job = await _prepare(session, user, pages=3, ocr_pages=3)
+    _document, job = await _prepare(session, user, pages=3, ocr_pages=3)
     job.pages_done = 2
     await session.commit()
 

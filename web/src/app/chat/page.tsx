@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Shell } from "@/components/Shell";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, type Page } from "@/lib/api";
 import { citationLabel, stripCitationMarkers, type Citation } from "@/lib/citations";
 type Message = {
   role: "user" | "assistant";
@@ -35,6 +35,9 @@ type HistoryMessage = {
 
 /** จำ session ที่เปิดล่าสุดไว้ เพื่อให้ refresh แล้วได้บทสนทนาเดิมกลับมา */
 const LAST_SESSION_KEY = "rag.chat.lastSession";
+
+/** จำนวนบทสนทนาต่อหนึ่งหน้า — ตรงกับค่าเริ่มต้นของ API */
+const SESSION_PAGE_SIZE = 30;
 
 /** อ่าน SSE จาก POST — EventSource ใช้ไม่ได้เพราะรองรับแค่ GET */
 async function* readSse(response: Response): AsyncGenerator<{ event: string; data: string }> {
@@ -73,6 +76,9 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  // ประวัติสะสมเร็วกว่าเอกสารมาก — คุยวันละครั้งก็ชน 30 รายการใน 1 เดือน
+  const [sessionLimit, setSessionLimit] = useState(SESSION_PAGE_SIZE);
+  const [totalSessions, setTotalSessions] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const sessionId = useRef<string | null>(null);
@@ -80,12 +86,18 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
 
   const refreshSessions = useCallback(async () => {
     try {
-      const r = await fetch(`${API_BASE}/api/chat/sessions`, { credentials: "include" });
-      if (r.ok) setSessions(await r.json());
+      const r = await fetch(`${API_BASE}/api/chat/sessions?limit=${sessionLimit}`, {
+        credentials: "include",
+      });
+      if (r.ok) {
+        const page: Page<SessionSummary> = await r.json();
+        setSessions(page.items);
+        setTotalSessions(page.total);
+      }
     } catch {
       // รายการบทสนทนาโหลดไม่ได้ ไม่ควรกันไม่ให้ถามคำถามใหม่ จึงปล่อยเงียบ
     }
-  }, []);
+  }, [sessionLimit]);
 
   const openSession = useCallback(async (id: string) => {
     setError(null);
@@ -118,10 +130,13 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
       try {
         const r = await fetch(`${API_BASE}/api/chat/sessions`, { credentials: "include" });
         if (!r.ok) return;
-        const list: SessionSummary[] = await r.json();
-        setSessions(list);
+        const page: Page<SessionSummary> = await r.json();
+        setSessions(page.items);
+        setTotalSessions(page.total);
         const remembered = localStorage.getItem(LAST_SESSION_KEY);
-        if (remembered && list.some((s) => s.id === remembered)) await openSession(remembered);
+        if (remembered && page.items.some((s) => s.id === remembered)) {
+          await openSession(remembered);
+        }
       } finally {
         setLoadingHistory(false);
       }
@@ -298,6 +313,16 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
               </li>
             ))}
           </ul>
+          {/* บอกว่ายังมีอีกแทนที่จะตัดเงียบ ๆ ที่ 30 รายการ */}
+          {totalSessions > sessions.length && (
+            <button
+              className="btn ghost"
+              onClick={() => setSessionLimit((n) => n + SESSION_PAGE_SIZE)}
+              disabled={busy}
+            >
+              โหลดเพิ่ม ({sessions.length}/{totalSessions})
+            </button>
+          )}
         </aside>
 
         <div className="chat-main">

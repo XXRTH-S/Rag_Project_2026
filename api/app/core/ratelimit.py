@@ -74,9 +74,29 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-async def enforce(request: Request, *, scope: str, limit: int, window_seconds: int) -> None:
-    """ใช้ใน endpoint โดยตรง — โยน 429 พร้อม Retry-After ถ้าเกิน"""
-    verdict = await hit(f"{scope}:{client_ip(request)}", limit=limit, window_seconds=window_seconds)
+async def enforce(
+    request: Request,
+    *,
+    scope: str,
+    limit: int,
+    window_seconds: int,
+    subject: str | None = None,
+) -> None:
+    """ใช้ใน endpoint โดยตรง — โยน 429 พร้อม Retry-After ถ้าเกิน
+
+    subject คือสิ่งที่ใช้แยกว่าใครเป็นใคร ส่ง user id มาเมื่อรู้ว่าใครเรียก
+    ถ้าไม่ส่งจะถอยไปใช้ IP
+
+    ทำไมต้องแยก: การนับต่อ IP อย่างเดียวใช้ไม่ได้กับ endpoint ที่ต้องล็อกอิน
+    เพราะคนทั้งออฟฟิศที่ออกเน็ตผ่าน NAT ตัวเดียวกันจะถูกนับรวมเป็นคนเดียว
+    คนหนึ่งยิงรัวแล้วทั้งห้องใช้ไม่ได้ ซึ่งไม่ใช่สิ่งที่เพดาน "20 ครั้งต่อนาที"
+    ตั้งใจจะสื่อ · พอรู้ว่าใครเรียกแล้วก็ควรนับต่อคน ไม่ใช่ต่อสายเน็ต
+
+    ส่วน /api/auth/login ยังต้องนับต่อ IP เพราะตอนนั้นยังไม่รู้ว่าใครเรียก
+    (และถ้าไปนับต่ออีเมลก็จะเปิดช่องให้ยิงรหัสผิดใส่บัญชีคนอื่นจนเขาเข้าไม่ได้)
+    """
+    key = subject or client_ip(request)
+    verdict = await hit(f"{scope}:{key}", limit=limit, window_seconds=window_seconds)
     if not verdict.allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

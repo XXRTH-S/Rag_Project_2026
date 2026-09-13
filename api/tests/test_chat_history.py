@@ -112,7 +112,7 @@ async def test_new_conversation_appears_in_the_list(
 
     resp = await client.get("/api/chat/sessions", headers=headers)
     assert resp.status_code == 200
-    rows = resp.json()
+    rows = resp.json()["items"]
     assert len(rows) == 1
     assert rows[0]["id"] == sid
     # หัวข้อมาจากคำถามแรก ไม่ใช่คอลัมน์ที่ต้อง migrate เพิ่ม
@@ -128,7 +128,7 @@ async def test_long_question_is_trimmed_for_the_title(
     headers = await _auth(client, user)
     await _ask(client, headers, "ก" * 200)
 
-    rows = (await client.get("/api/chat/sessions", headers=headers)).json()
+    rows = (await client.get("/api/chat/sessions", headers=headers)).json()["items"]
     assert len(rows[0]["title"]) < 200
     assert rows[0]["title"].endswith("…")
 
@@ -180,7 +180,7 @@ async def test_conversation_continues_in_the_same_session(
     sid2, _ = await _ask(client, headers, "แล้วสะสมข้ามปีได้ไหม", session_id=sid)
     assert sid2 == sid
 
-    rows = (await client.get("/api/chat/sessions", headers=headers)).json()
+    rows = (await client.get("/api/chat/sessions", headers=headers)).json()["items"]
     assert len(rows) == 1, "ถามต่อใน session เดิมต้องไม่สร้างบทสนทนาใหม่"
     assert rows[0]["message_count"] == 4
 
@@ -223,7 +223,7 @@ async def test_other_users_history_is_invisible(
 
     other = await _auth(client, admin)
     assert (await client.get(f"/api/chat/sessions/{sid}", headers=other)).status_code == 404
-    assert (await client.get("/api/chat/sessions", headers=other)).json() == []
+    assert (await client.get("/api/chat/sessions", headers=other)).json()["items"] == []
     # admin ก็ลบของคนอื่นไม่ได้ — ไม่ใช่เรื่องสิทธิ์ แต่บทสนทนาเป็นเรื่องส่วนตัว
     assert (await client.delete(f"/api/chat/sessions/{sid}", headers=other)).status_code == 404
 
@@ -237,7 +237,7 @@ async def test_delete_removes_the_conversation_and_its_messages(
 
     assert (await client.delete(f"/api/chat/sessions/{sid}", headers=headers)).status_code == 204
     assert (await client.get(f"/api/chat/sessions/{sid}", headers=headers)).status_code == 404
-    assert (await client.get("/api/chat/sessions", headers=headers)).json() == []
+    assert (await client.get("/api/chat/sessions", headers=headers)).json()["items"] == []
     # ข้อความและที่มาต้องหายตามไปด้วย ไม่ใช่ค้างเป็นขยะที่เข้าถึงไม่ได้
     assert (await session.execute(select(MessageCitation))).scalars().all() == []
 

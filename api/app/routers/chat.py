@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import ratelimit
@@ -51,6 +51,7 @@ async def chat(
         scope="chat",
         limit=settings.rate_limit_chat_per_minute,
         window_seconds=60,
+        subject=str(user.id),
     )
 
     chat_session = await orchestrator.ensure_session(
@@ -77,7 +78,7 @@ async def chat(
                 collection=payload.collection,
             ):
                 yield _sse(event, data)
-        except Exception:  # noqa: BLE001
+        except Exception:
             # ข้อความ exception ดิบมีทั้งชื่อโฮสต์ พอร์ต และ path ของไฟล์ในเครื่อง
             # (error ของ asyncpg/httpx มีครบ) ส่งออกไปเท่ากับแจกผังระบบให้คนนอก
             #

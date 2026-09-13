@@ -20,7 +20,7 @@ def particle(monkeypatch):
 
 def test_particle_appears_in_rules(particle) -> None:
     particle("ค่ะ")
-    text = prompts._build_default_prompt()  # noqa: SLF001
+    text = prompts._build_default_prompt()
     assert 'ลงท้ายคำตอบด้วย "ค่ะ"' in text
     assert "ครับ" not in text, "ต้องไม่มีคำลงท้ายที่ hardcode ไว้หลงเหลือ"
 
@@ -30,19 +30,19 @@ def test_particle_is_bound_to_thai_answers_only(particle) -> None:
     คำถามภาษาอังกฤษจะได้ "...per year ครับ" ซึ่งอ่านแปลก
     """
     particle("ครับ")
-    assert "เมื่อตอบเป็นภาษาไทย" in prompts._politeness_rules()  # noqa: SLF001
+    assert "เมื่อตอบเป็นภาษาไทย" in prompts._politeness_rules()
 
 
 def test_particle_asked_for_once_not_every_sentence(particle) -> None:
     """โมเดล 4B มักใส่คำลงท้ายทุกประโยคจนอ่านรำคาญ ถ้าไม่ห้ามไว้"""
     particle("ครับ")
-    assert "หนึ่งครั้ง" in prompts._politeness_rules()  # noqa: SLF001
+    assert "หนึ่งครั้ง" in prompts._politeness_rules()
 
 
 def test_empty_particle_removes_the_rules_entirely(particle) -> None:
     """ตั้งค่าว่าง = ปิดคำลงท้าย ต้องไม่เหลือกฎเปล่า ๆ ที่ทำให้โมเดลสับสน"""
     particle("")
-    assert prompts._politeness_rules() == ""  # noqa: SLF001
+    assert prompts._politeness_rules() == ""
     text = prompts._build_default_prompt()
     assert "\n6." not in text
     assert prompts._no_context_answer() == "ไม่พบข้อมูลนี้ในเอกสารที่มีอยู่"
@@ -51,7 +51,7 @@ def test_empty_particle_removes_the_rules_entirely(particle) -> None:
 def test_whitespace_only_particle_counts_as_empty(particle) -> None:
     """.env ที่เขียน BOT_POLITE_PARTICLE= แล้วเผลอเว้นวรรค ต้องไม่ได้คำตอบที่มีช่องว่างห้อยท้าย"""
     particle("   ")
-    assert prompts._politeness_rules() == ""  # noqa: SLF001
+    assert prompts._politeness_rules() == ""
     assert prompts._no_context_answer() == "ไม่พบข้อมูลนี้ในเอกสารที่มีอยู่"
 
 
@@ -60,7 +60,7 @@ def test_no_context_answer_matches_the_rule_verbatim(particle) -> None:
     ผู้ใช้จะเห็นข้อความ "ไม่พบข้อมูล" สองแบบ ขึ้นกับว่า retrieval ตัดทิ้งหรือ LLM ตอบ
     """
     particle("ค่ะ")
-    assert f'"{prompts._no_context_answer()}"' in prompts._build_default_prompt()  # noqa: SLF001
+    assert f'"{prompts._no_context_answer()}"' in prompts._build_default_prompt()
 
 
 def test_system_written_notice_is_polite_too() -> None:

@@ -162,7 +162,7 @@ print("=== 6.5 ประวัติบทสนทนา ===")
 r = httpx.get(f"{BASE}/api/chat/sessions", headers=admin, timeout=60)
 check("ดึงรายการบทสนทนาได้", r.status_code == 200, f"{r.status_code} {r.text[:150]}")
 if r.status_code == 200:
-    rows = r.json()
+    rows = r.json()["items"]
     check("บทสนทนาที่เพิ่งคุยอยู่ในรายการ", any(x["id"] == sid for x in rows), sid)
     row = next((x for x in rows if x["id"] == sid), None)
     if row:

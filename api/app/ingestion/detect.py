@@ -65,7 +65,7 @@ def plan_pdf(path: Path) -> DocumentPlan:
     if reader.is_encrypted:
         try:
             reader.decrypt("")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise UnsupportedFileType("PDF ถูกเข้ารหัสไว้ เปิดอ่านไม่ได้") from exc
 
     plan = DocumentPlan()

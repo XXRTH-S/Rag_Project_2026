@@ -29,9 +29,9 @@ def extract_docx(path: Path) -> str:
 
 
 def extract_html(raw: str) -> str:
-    raw = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=re.S | re.I)
-    raw = re.sub(r"<br\s*/?>", "\n", raw, flags=re.I)
-    raw = re.sub(r"</(p|div|li|h[1-6]|tr)>", "\n\n", raw, flags=re.I)
+    raw = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=re.DOTALL | re.IGNORECASE)
+    raw = re.sub(r"<br\s*/?>", "\n", raw, flags=re.IGNORECASE)
+    raw = re.sub(r"</(p|div|li|h[1-6]|tr)>", "\n\n", raw, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", " ", raw)
     from html import unescape
 

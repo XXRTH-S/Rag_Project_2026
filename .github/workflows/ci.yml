@@ -1,0 +1,95 @@
+name: CI
+
+# รันเทสทุกครั้งที่ push หรือเปิด PR
+#
+# ไม่ต้องมี GPU: เทสฝั่ง API stub ทั้ง LLM, OCR และ embedding ไว้หมดแล้ว
+# ที่ต้องมีจริงคือ Postgres (ต้องเป็น pgvector เพราะ migration สร้างคอลัมน์ vector)
+# กับ Redis (rate limit เทสกับของจริง ไม่ mock เพราะสิ่งที่ต้องพิสูจน์คือ
+# INCR/EXPIRE ทำงานถูกและ key หมดอายุจริง)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # ต้องเป็น pgvector ไม่ใช่ postgres ธรรมดา — migration 0001 สร้าง vector(1024)
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: rag
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: rag
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rag"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://rag:changeme@localhost:5432/rag
+      REDIS_URL: redis://localhost:6379/0
+      APP_SECRET_KEY: ci-only-not-a-real-secret
+      UPLOAD_DIR: /tmp/uploads
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: ติดตั้ง dependency ของระบบ
+        # ต้องตรงกับที่ api/Dockerfile ติดตั้ง ไม่งั้น CI ผ่านแต่ของจริงพัง (หรือกลับกัน)
+        #   libmagic1     — python-magic เรียกใช้ ไม่ได้มากับ pip
+        #   poppler-utils — ให้คำสั่ง pdftoppm ที่ใช้เรนเดอร์หน้า PDF ก่อนส่งเข้า OCR
+        run: sudo apt-get update && sudo apt-get install -y libmagic1 poppler-utils
+
+      - name: ติดตั้ง dependency ของ python
+        working-directory: api
+        run: pip install -e ".[dev]"
+
+      - name: ตรวจ lint
+        working-directory: api
+        run: ruff check app tests
+
+      - name: รันเทส
+        working-directory: api
+        run: python -m pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: ติดตั้ง dependency
+        working-directory: web
+        # ci ไม่ใช่ install — ยึดตาม package-lock.json เป๊ะ ๆ
+        # ไม่งั้น CI อาจผ่านด้วยเวอร์ชันที่ต่างจากที่เครื่องเราใช้
+        run: npm ci
+
+      - name: ตรวจ lint ชนิดข้อมูล และรันเทส
+        working-directory: web
+        run: npm run check

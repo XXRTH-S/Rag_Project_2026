@@ -207,7 +207,7 @@ async def _run(job_id: uuid.UUID, task_type: str | None = None, session_factory=
                 "gpu_seconds": round(gpu_seconds, 1),
             }
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # ข้อความนี้ถูกเก็บลง DB แล้วโชว์บนหน้า Documents ของผู้ใช้
             # exception ดิบของ asyncpg/httpx มีชื่อโฮสต์ พอร์ต และ path ในเครื่องติดมาด้วย
             # จึงแยกสองทาง: ข้อผิดพลาดที่เราตั้งใจให้ผู้ใช้อ่าน (เช่นไฟล์ไม่รองรับ)
@@ -263,5 +263,5 @@ async def _run_then_release_pool(job_id: uuid.UUID, task_type: str | None) -> di
 
 
 @celery_app.task(name="app.ingestion.tasks.ingest_document", bind=True)
-def ingest_document(self, job_id: str, task_type: str | None = None) -> dict:  # noqa: ANN001, ARG001
+def ingest_document(self, job_id: str, task_type: str | None = None) -> dict:
     return asyncio.run(_run_then_release_pool(uuid.UUID(job_id), task_type))

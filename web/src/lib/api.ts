@@ -53,6 +53,19 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ---------- types ----------
 
+/** ผลลัพธ์แบบแบ่งหน้า
+ *
+ * total ทำให้หน้าเว็บบอกได้ว่า "แสดง 50 จาก 137" และรู้ว่ายังมีให้โหลดอีก
+ * เดิม API คืน array เปล่า ๆ พร้อม limit ตายตัว ผู้ใช้จึงเข้าใจผิดว่า
+ * ที่เห็นคือทั้งหมดที่มี
+ */
+export type Page<T> = {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type Me = {
   id: string;
   email: string;

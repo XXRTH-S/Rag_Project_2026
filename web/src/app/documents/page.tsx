@@ -11,11 +11,15 @@ import {
   formatDuration,
   type DocumentOut,
   type JobOut,
+  type Page,
   type Quota,
   type UploadAccepted,
 } from "@/lib/api";
 
 const ACTIVE_STATES = new Set(["pending", "processing"]);
+
+/** จำนวนแถวต่อหนึ่งหน้า — ตรงกับค่าเริ่มต้นของ API */
+const PAGE_SIZE = 50;
 
 function QuotaCard({ quota }: { quota: Quota | null }) {
   if (!quota) return null;
@@ -81,14 +85,24 @@ function DocumentsInner() {
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // ขยายเพดานทีละหน้าแทนการสะสมรายการที่โหลดมา
+  //
+  // หน้านี้ refresh ตัวเองเป็นระยะระหว่างที่มีงานประมวลผล ถ้าสะสมทีละหน้า
+  // รายการที่โหลดไว้จะชนกับผลของ refresh (ซ้ำบ้าง หายบ้าง เมื่อมีเอกสารใหม่
+  // แทรกขึ้นมาด้านบน) การขอ limit ที่ใหญ่ขึ้นแล้วแทนที่ทั้งชุดจึงตรงกว่า
+  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+  const [totalDocuments, setTotalDocuments] = useState(0);
+
   const refresh = useCallback(async () => {
     try {
-      const [q, docs] = await Promise.all([
+      const [q, page] = await Promise.all([
         api<Quota>("/api/me/quota"),
-        api<DocumentOut[]>("/api/documents"),
+        api<Page<DocumentOut>>(`/api/documents?limit=${visibleLimit}`),
       ]);
+      const docs = page.items;
       setQuota(q);
       setDocuments(docs);
+      setTotalDocuments(page.total);
 
       // ดึงสถานะงานเฉพาะเอกสารที่ยังไม่จบ ไม่ยิงทุกแถวทุกรอบ
       const active = docs.filter((d) => ACTIVE_STATES.has(d.status));
@@ -109,7 +123,7 @@ function DocumentsInner() {
         setError(err instanceof Error ? err.message : "โหลดข้อมูลไม่สำเร็จ");
       }
     }
-  }, []);
+  }, [visibleLimit]);
 
   const hasActiveWork = documents.some((d) => ACTIVE_STATES.has(d.status));
 
@@ -247,7 +261,17 @@ function DocumentsInner() {
         </div>
       </form>
 
-      <h2>รายการเอกสาร</h2>
+      <h2>
+        รายการเอกสาร
+        {/* บอกให้ชัดว่ายังมีอีก — เดิมตัดที่ 50 แถวเงียบ ๆ ผู้ใช้จึงเข้าใจผิด
+            ว่าเอกสารเก่าหายไปแล้ว */}
+        {totalDocuments > documents.length && (
+          <span className="muted" style={{ fontSize: "0.85rem", fontWeight: 400 }}>
+            {" "}
+            แสดง {documents.length} จาก {totalDocuments}
+          </span>
+        )}
+      </h2>
       {documents.length === 0 ? (
         <p className="muted">ยังไม่มีเอกสาร</p>
       ) : (
@@ -305,6 +329,14 @@ function DocumentsInner() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {totalDocuments > documents.length && (
+        <div className="btn-row" style={{ marginTop: "0.75rem" }}>
+          <button className="btn ghost" onClick={() => setVisibleLimit((n) => n + PAGE_SIZE)}>
+            โหลดเพิ่มอีก {Math.min(PAGE_SIZE, totalDocuments - documents.length)} รายการ
+          </button>
         </div>
       )}
     </>

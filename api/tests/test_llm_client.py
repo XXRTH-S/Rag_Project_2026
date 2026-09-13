@@ -49,7 +49,7 @@ def test_disabling_thinking_sends_both_runtime_flags() -> None:
     thinking จึงทำงานอยู่ตลอด — คำถาม "1+1" สร้าง reasoning ซ่อน 3,307 token
     ใช้เวลา 86 วินาที เทียบกับ 2 token ใน 0.6 วินาทีเมื่อปิดถูกวิธี
     """
-    payload = ChatClient()._payload(  # noqa: SLF001
+    payload = ChatClient()._payload(
         [{"role": "user", "content": "hi"}], enable_thinking=False
     )
     assert payload["chat_template_kwargs"] == {"enable_thinking": False}, "vLLM ต้องได้ฟิลด์นี้"
@@ -57,7 +57,7 @@ def test_disabling_thinking_sends_both_runtime_flags() -> None:
 
 
 def test_thinking_flags_are_absent_when_enabled() -> None:
-    payload = ChatClient()._payload(  # noqa: SLF001
+    payload = ChatClient()._payload(
         [{"role": "user", "content": "hi"}], enable_thinking=True
     )
     assert "chat_template_kwargs" not in payload
@@ -69,7 +69,7 @@ def test_reasoning_effort_can_be_turned_off_for_strict_providers(monkeypatch) ->
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "llm_reasoning_effort", "")
-    payload = ChatClient()._payload(  # noqa: SLF001
+    payload = ChatClient()._payload(
         [{"role": "user", "content": "hi"}], enable_thinking=False
     )
     assert "reasoning_effort" not in payload

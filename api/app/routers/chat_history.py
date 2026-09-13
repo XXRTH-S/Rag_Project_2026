@@ -18,6 +18,7 @@ from app.core.db import get_session
 from app.core.deps import get_current_user
 from app.models.chat import ChatMessage, ChatSession, Feedback, MessageCitation
 from app.models.user import User
+from app.schemas.base import Page
 
 router = APIRouter(prefix="/api/chat", tags=["chat-history"])
 
@@ -71,12 +72,13 @@ async def _owned_session(
     return chat_session
 
 
-@router.get("/sessions", response_model=list[SessionSummary])
+@router.get("/sessions", response_model=Page[SessionSummary])
 async def list_sessions(
     limit: int = Query(default=30, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
-) -> list[SessionSummary]:
+) -> Page[SessionSummary]:
     # นับข้อความและหาเวลาล่าสุดในคิวรี่เดียว ไม่วนถามทีละ session
     stats = (
         select(
@@ -91,17 +93,24 @@ async def list_sessions(
     # join ธรรมดา (ไม่ใช่ outer) เพื่อตัด session ที่ยังไม่มีข้อความเลยออกไป
     # แถวแบบนั้นเกิดได้จริง: POST /chat สร้าง session ก่อนเรียกโมเดล
     # ถ้าโมเดลล้มกลางทาง session เปล่าจะค้างอยู่ ซึ่งไม่ควรโชว์ให้ผู้ใช้เห็น
-    rows = (
+    visible = (
+        select(ChatSession, stats.c.n, stats.c.last_at)
+        .join(stats, stats.c.sid == ChatSession.id)
+        .where(ChatSession.user_id == user.id)
+    )
+
+    # นับด้วยเงื่อนไขเดียวกับที่ดึง ไม่งั้นตัวเลข "จากทั้งหมด" จะไม่ตรงกับที่เห็นจริง
+    total = (
         await session.execute(
-            select(ChatSession, stats.c.n, stats.c.last_at)
-            .join(stats, stats.c.sid == ChatSession.id)
-            .where(ChatSession.user_id == user.id)
-            .order_by(stats.c.last_at.desc())
-            .limit(limit)
+            select(func.count()).select_from(visible.subquery())
         )
+    ).scalar_one()
+
+    rows = (
+        await session.execute(visible.order_by(stats.c.last_at.desc()).limit(limit).offset(offset))
     ).all()
     if not rows:
-        return []
+        return Page[SessionSummary](items=[], total=total, limit=limit, offset=offset)
 
     ids = [row[0].id for row in rows]
 
@@ -130,7 +139,7 @@ async def list_sessions(
                 created_at=chat_session.created_at.isoformat(),
             )
         )
-    return out
+    return Page[SessionSummary](items=out, total=total, limit=limit, offset=offset)
 
 
 @router.get("/sessions/{session_id}", response_model=SessionDetail)

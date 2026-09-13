@@ -7,7 +7,7 @@
 import re
 
 from app.core.config import settings
-from app.retrieval.search import SearchHit  # noqa: TC001
+from app.retrieval.search import SearchHit
 
 
 def _particle() -> str:

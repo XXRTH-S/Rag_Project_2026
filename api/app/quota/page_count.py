@@ -44,7 +44,7 @@ def _count_pdf_pages(path: Path) -> PageEstimate:
         # ลองเปิดด้วยรหัสว่าง ซึ่งพอได้กับ PDF ที่ล็อกแค่สิทธิ์การพิมพ์
         try:
             reader.decrypt("")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise UnsupportedFileType("PDF ถูกเข้ารหัสไว้ เปิดอ่านไม่ได้") from exc
     return PageEstimate(pages=len(reader.pages), estimated=False, detail="pypdf page tree")
 
@@ -104,7 +104,7 @@ def count_pages(path: Path, mime_type: str) -> PageEstimate:
         if mime in {"text/html", "application/xhtml+xml"}:
             import re
 
-            raw = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=re.S | re.I)
+            raw = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=re.DOTALL | re.IGNORECASE)
             raw = re.sub(r"<[^>]+>", " ", raw)
         return _estimate_from_text(raw, source=mime)
 

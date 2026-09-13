@@ -13,7 +13,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import ratelimit
@@ -26,6 +26,7 @@ from app.models.document import Document, IngestionJob
 from app.models.user import User
 from app.quota import service as quota_service
 from app.quota.page_count import UnsupportedFileType, count_pages
+from app.schemas.base import Page
 from app.schemas.documents import DocumentOut, JobOut, UploadAccepted
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -119,6 +120,7 @@ async def upload_document(
         scope="upload",
         limit=settings.rate_limit_upload_per_hour,
         window_seconds=3600,
+        subject=str(user.id),
     )
 
     limit = settings.max_upload_mb * 1024 * 1024
@@ -174,7 +176,7 @@ async def upload_document(
 
     try:
         job.celery_task_id = ingest_queue.enqueue_ingestion(job.id, queue=job.queue)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         # broker ล่ม = งานไม่มีวันถูกหยิบ ต้องคืนโควตาทันที ไม่ใช่ปล่อยให้ค้าง
         log.exception("ส่งงานเข้าคิวไม่สำเร็จ")
         await quota_service.release(session, user, document_id, note="enqueue failed")
@@ -196,18 +198,36 @@ async def upload_document(
     )
 
 
-@router.get("", response_model=list[DocumentOut])
+@router.get("", response_model=Page[DocumentOut])
 async def list_documents(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
-    stmt = select(Document).order_by(Document.created_at.desc()).limit(limit)
     # กรองสิทธิ์ที่ระดับ SQL ไม่ใช่กรองหลังดึงมาแล้ว
-    if not user.is_admin:
-        stmt = stmt.where(Document.owner_id == user.id)
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
+    def scoped(stmt):
+        return stmt if user.is_admin else stmt.where(Document.owner_id == user.id)
+
+    total = (
+        await session.execute(scoped(select(func.count()).select_from(Document)))
+    ).scalar_one()
+
+    rows = (
+        await session.execute(
+            scoped(select(Document))
+            .order_by(Document.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).scalars().all()
+
+    return Page[DocumentOut](
+        items=[DocumentOut.model_validate(d) for d in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentOut)
@@ -263,7 +283,7 @@ async def delete_document(
 
     try:
         path.unlink(missing_ok=True)
-    except OSError as exc:  # noqa: BLE001
+    except OSError as exc:
         # ลบแถวไปแล้ว ไฟล์ค้างไม่ทำให้ระบบพัง แค่กินดิสก์
         log.warning("ลบไฟล์ %s ไม่สำเร็จ: %s", path, exc)
 

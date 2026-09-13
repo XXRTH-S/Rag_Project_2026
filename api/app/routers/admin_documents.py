@@ -118,7 +118,7 @@ async def reprocess_document(
         job.celery_task_id = ingest_queue.enqueue_ingestion(
             job.id, queue=job.queue, task_type=task_type
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.exception("ส่งงาน reprocess เข้าคิวไม่สำเร็จ")
         job.stage = "failed"
         job.error = f"ส่งงานเข้าคิวไม่สำเร็จ: {exc}"
@@ -213,7 +213,7 @@ async def bulk_upload(
     for name, document, job in queued:
         try:
             job.celery_task_id = ingest_queue.enqueue_ingestion(job.id, queue=job.queue)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("ส่งงาน bulk เข้าคิวไม่สำเร็จ: %s", name)
             job.stage = "failed"
             job.error = f"ส่งงานเข้าคิวไม่สำเร็จ: {exc}"

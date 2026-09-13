@@ -7,7 +7,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,7 +50,7 @@ class PromptConfigOut(PromptConfigIn):
     id: uuid.UUID
     is_active: bool
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.post("/playground/query")
@@ -67,6 +67,7 @@ async def playground_query(
         scope="playground",
         limit=settings.rate_limit_playground_per_minute,
         window_seconds=60,
+        subject=str(admin.id),
     )
 
     hits = await orchestrator.retrieve(

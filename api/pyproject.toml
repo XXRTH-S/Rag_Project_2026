@@ -42,6 +42,17 @@ include = ["app*"]
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+ignore = [
+    # Depends() ในค่าเริ่มต้นของพารามิเตอร์คือวิธีเขียนมาตรฐานของ FastAPI ทั้งเฟรมเวิร์ก
+    # ไม่ใช่ความพลาดแบบ mutable default ที่กฎนี้ตั้งใจจับ · ถ้าไม่ปิดจะมี 64 จุดเตือน
+    # ตลอดไปจนคนเลิกอ่านผล lint ซึ่งอันตรายกว่าการปิดกฎเดียว
+    "B008",
+    # ไฟล์ถูกมองว่า executable เพราะ bind mount ของวินโดวส์ตั้ง permission แบบนั้น
+    # ไม่ใช่สิ่งที่อยู่ใน git จริง (ทุกไฟล์ commit เป็น 100644) และไม่เกิดบน CI
+    "EXE002",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 # Dockerfile ติดตั้ง deps ตั้งแต่ยังไม่มีโค้ด (เพื่อ layer cache) ตัว app จึงไม่อยู่ใน

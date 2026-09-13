@@ -69,6 +69,9 @@ def migrated_test_database() -> None:
         capture_output=True,
         text=True,
         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        # อ่าน returncode เองเพื่อแนบ stdout/stderr ของ alembic ไปกับ error
+        # ไม่งั้นเทสล้มโดยบอกแค่ "คำสั่งคืนค่า 1" ซึ่งตามต่อไม่ได้เลย
+        check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(f"alembic upgrade ล้มเหลว:\n{result.stdout}\n{result.stderr}")
@@ -92,7 +95,7 @@ async def clean_rate_limits() -> AsyncGenerator[None, None]:
     """
     from app.core import ratelimit
 
-    client = ratelimit._redis()  # noqa: SLF001
+    client = ratelimit._redis()
     keys = [key async for key in client.scan_iter("rl:*")]
     if keys:
         await client.delete(*keys)

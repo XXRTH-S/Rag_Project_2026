@@ -71,3 +71,56 @@ async def test_chat_endpoint_returns_429_with_retry_after(
     assert resp.status_code == 429
     assert "Retry-After" in resp.headers
     assert int(resp.headers["Retry-After"]) > 0
+
+
+async def test_two_users_on_the_same_ip_do_not_share_a_budget(
+    client: AsyncClient, user: User, admin: User, monkeypatch
+) -> None:
+    """คนละคนต้องมีเพดานของตัวเอง แม้ออกเน็ตจากที่เดียวกัน
+
+    เดิมนับต่อ IP อย่างเดียว คนทั้งออฟฟิศที่ออกผ่าน NAT ตัวเดียวกันจึงถูกนับรวม
+    เป็นคนเดียว คนหนึ่งยิงรัวแล้วทั้งห้องใช้ไม่ได้ ซึ่งไม่ใช่สิ่งที่เพดาน
+    "20 ครั้งต่อนาที" ตั้งใจจะสื่อ
+
+    ในเทสทุกคำขอมาจาก IP เดียวกันอยู่แล้ว (ASGI transport) จึงเป็นการจำลอง
+    สถานการณ์นั้นพอดี
+    """
+    monkeypatch.setattr(settings, "rate_limit_chat_per_minute", 2)
+
+    async def login(u: User) -> dict[str, str]:
+        resp = await client.post(
+            "/api/auth/login", json={"email": u.email, "password": TEST_PASSWORD}
+        )
+        return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+    first = await login(user)
+    second = await login(admin)
+
+    # คนแรกใช้จนเต็มเพดานแล้วโดนบล็อก
+    for _ in range(3):
+        await client.post("/api/chat", headers=first, json={"message": "สวัสดี"})
+    blocked = await client.post("/api/chat", headers=first, json={"message": "สวัสดี"})
+    assert blocked.status_code == 429
+
+    # คนที่สองต้องยังใช้ได้ตามปกติ
+    resp = await client.post("/api/chat", headers=second, json={"message": "สวัสดี"})
+    assert resp.status_code != 429, "คนที่สองโดนบล็อกทั้งที่ยังไม่ได้ใช้โควตาของตัวเองเลย"
+
+
+async def test_login_is_still_counted_per_ip(client: AsyncClient, user: User, monkeypatch) -> None:
+    """login ต้องนับต่อ IP เพราะยังไม่รู้ว่าใครเรียก
+
+    และห้ามไปนับต่ออีเมล ไม่งั้นใครก็ยิงรหัสผิดใส่บัญชีคนอื่นจนเขาเข้าไม่ได้
+    ที่นี่พิสูจน์ว่าการลองกับ *คนละอีเมล* จาก IP เดียวกันยังนับรวมกัน
+    """
+    monkeypatch.setattr(settings, "rate_limit_login_attempts", 3)
+    monkeypatch.setattr(settings, "rate_limit_login_window_seconds", 60)
+
+    codes = []
+    for i in range(5):
+        resp = await client.post(
+            "/api/auth/login", json={"email": f"who-{i}@example.com", "password": "wrong"}
+        )
+        codes.append(resp.status_code)
+
+    assert 429 in codes, f"ยิงหลายอีเมลจาก IP เดียวกันต้องยังโดนนับรวม แต่ได้ {codes}"
