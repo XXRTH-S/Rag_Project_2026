@@ -1,599 +1,1566 @@
+/* ทุกสีในไฟล์นี้ต้องมาจาก token ในบล็อกนี้เท่านั้น
+ *
+ * เหตุผล: ตอนยกเครื่อง UI มีสีที่เขียนตรง ๆ กระจายอยู่ 40 กว่าจุด พอจะทำโหมดมืด
+ * จึงเหลือจุดสีสว่างค้างเป็นหย่อม ๆ ที่ต้องไล่เก็บทีละอัน · ถ้ามีสีใหม่ที่ยังไม่มี
+ * token ให้เพิ่ม token ก่อน อย่าเขียน hex ลงไปในกฎ
+ *
+ * อัตราส่วนความต่างของสีที่กำกับไว้วัดด้วยสูตรของ WCAG จริง ไม่ใช่กะเอา
+ * เกณฑ์: ตัวอักษรปกติ 4.5:1 · ขอบและองค์ประกอบ UI 3:1
+ */
 :root {
-  --bg: #ffffff;
-  --fg: #18181b;
-  --muted: #71717a;
-  --border: #e4e4e7;
-  --card: #fafafa;
-  --raised: #ffffff;
-  --accent: #4f46e5;
-  --accent-fg: #ffffff;
-  --ok: #15803d;
-  --ok-bg: #dcfce7;
-  --warn: #b45309;
-  --warn-bg: #fef3c7;
-  --fail: #b91c1c;
-  --fail-bg: #fee2e2;
-}
+  color-scheme: light;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #09090b;
-    --fg: #fafafa;
-    --muted: #a1a1aa;
-    --border: #27272a;
-    --card: #131316;
-    --raised: #1c1c20;
-    --accent: #818cf8;
-    --accent-fg: #0b0b0f;
-    --ok: #4ade80;
-    --ok-bg: #14311f;
-    --warn: #fbbf24;
-    --warn-bg: #3a2a08;
-    --fail: #f87171;
-    --fail-bg: #3b1414;
-  }
-}
+  /* ---------- พื้นผิว เรียงจากตื้นไปลึก ---------- */
+  --raised: #ece2d0;
+  --bg: #e8dcc7;
+  --card: #e0d3bb;
+  --th-bg: #d9ccb3;
+  --sunken: #d4c5a8; /* แถบนำทาง, code, แถวที่เลือกอยู่ */
+  --track: #cfc1a7; /* รางของแถบความคืบหน้า */
+  --surface-hover: #c6b99f;
 
+  /* ---------- ตัวอักษร ---------- */
+  --fg: #302f25; /* 9.94:1 บน --bg */
+  --muted: #544f41; /* 6.02 บน --bg · 5.52 บน --card · 4.80 บน --sunken */
+  --placeholder: #665d4d; /* 4.78 บน --bg */
+
+  /* ---------- เส้นขอบ ----------
+   * แยกสองตัวโดยตั้งใจ · WCAG 1.4.11 บังคับ 3:1 เฉพาะขอบที่ *สื่อความหมาย*
+   * เช่นกรอบ input หรือขอบปุ่ม ส่วนเส้นคั่นเพื่อความสวยงามไม่บังคับ
+   * ถ้าใช้ token เดียวก็ต้องเลือกระหว่าง "สวย" กับ "ผ่าน" ทั้งที่ไม่จำเป็น
+   */
+  --border: #c6b99f; /* ตกแต่ง — เส้นคั่นที่ไม่ได้บอกขอบเขตของตัวควบคุม */
+  --border-strong: #83704b; /* 3.53 บน --bg · 3.24 บน --card */
+
+  /* ---------- สีหลัก ---------- */
+  --accent: #5b6634; /* 4.56 บน --bg — ใช้เป็นสีตัวอักษรของลิงก์ด้วย */
+  --accent-fg: #f0e5cc; /* 4.94 บน --accent */
+  --accent-hover: #4d592c;
+  --accent-soft: #8b9d83;
+  --accent-ring: #9eaa78;
+  --on-accent-muted: #e9e0cb; /* ตัวอักษรรองบนพื้น accent */
+  --active-dot: #e0c8a8; /* 3.83 บน --accent */
+  --avatar-bg: #b08b6e;
+
+  /* ---------- สถานะ ---------- */
+  --ok: #42532e;
+  --ok-bg: #ced2ad; /* 5.36 */
+  --warn: #784c1d;
+  --warn-bg: #e6c995; /* 4.61 */
+  --fail: #843f32;
+  --fail-bg: #e7c4ac; /* 4.71 */
+  --alert-border: #b68066;
+  --badge-ready-border: #b3b991;
+
+  /* ---------- สีเน้นของการ์ด ---------- */
+  --tint-sage: #d4d6ba;
+  --tint-peach: #dfc4a8;
+  --tint-sand: #d9c6a1;
+
+  /* ---------- อื่น ๆ ---------- */
+  --focus: #98613d; /* 3.77 บน --bg */
+  --shadow-accent: #606c3818;
+  --shadow-drop: #302f2526;
+  --noise-opacity: 0.025;
+
+  --sidebar: 254px;
+  --radius: 20px;
+}
 * {
   box-sizing: border-box;
 }
-
 html,
 body {
   margin: 0;
   padding: 0;
+}
+body {
   background: var(--bg);
   color: var(--fg);
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", "Sarabun", sans-serif;
-  line-height: 1.6;
+  font-family: var(--font-thai), system-ui, sans-serif;
+  line-height: 1.65;
+  font-size: 14px;
 }
-
-/* ---------- layout ---------- */
-
+body:before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23000' filter='url(%23n)' opacity='.18' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+  opacity: var(--noise-opacity);
+}
+a {
+  color: inherit;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+a {
+  transition:
+    background 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.3s ease;
+}
+button {
+  cursor: pointer;
+}
+svg {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+a {
+  text-underline-offset: 4px;
+}
+.skip-link {
+  position: fixed;
+  top: -80px;
+  left: 20px;
+  z-index: 200;
+  background: var(--raised);
+  padding: 14px;
+  border-radius: 16px;
+}
+.skip-link:focus {
+  top: 12px;
+}
 .nav {
-  border-bottom: 1px solid var(--border);
-  background: var(--card);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.nav-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0.6rem 1.25rem;
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--sidebar);
+  background: var(--sunken);
+  border-right: 1px solid var(--border);
+  padding: 30px 20px 18px;
+  z-index: 30;
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  flex-wrap: wrap;
+  flex-direction: column;
 }
-
 .brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  text-decoration: none;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.5px;
 }
-
+.brand small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.brand-icon {
+  background: var(--accent);
+  color: var(--accent-fg);
+  width: 44px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+}
+.nav-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.nav-caption {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 38px 14px 12px;
+}
 .nav-links {
   display: flex;
-  gap: 0.25rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 7px;
 }
-
 .nav-link {
-  color: var(--muted);
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  padding: 13px 14px;
   text-decoration: none;
-  padding: 0.3rem 0.7rem;
-  border-radius: 6px;
-  font-size: 0.925rem;
+  border-radius: 16px;
+  color: var(--muted);
+  font-weight: 500;
 }
-
 .nav-link:hover {
-  background: var(--border);
+  background: var(--surface-hover);
   color: var(--fg);
 }
-
 .nav-link.active {
   background: var(--accent);
   color: var(--accent-fg);
 }
-
-.nav-user {
+.active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--active-dot);
   margin-left: auto;
+}
+.nav-guide {
+  margin: auto 0 22px;
+  padding: 20px 16px;
+  background: var(--surface-hover);
+  border-radius: 20px;
+}
+.nav-guide > svg {
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.nav-guide strong {
+  display: block;
+  font-size: 13px;
+}
+.nav-guide p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 8px 0 14px;
+}
+.nav-guide a {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.85rem;
+  justify-content: space-between;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12px;
 }
-
-main {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 2rem 1.25rem 4rem;
+.nav-user {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-
-main.narrow {
-  max-width: 620px;
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--avatar-bg);
+  color: var(--fg);
+  font-weight: 600;
 }
-
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 0.25rem;
-  letter-spacing: -0.01em;
+.user-info {
+  min-width: 0;
+  flex: 1;
 }
-
-h2 {
-  font-size: 1.1rem;
-  margin: 2rem 0 0.75rem;
+.user-info strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  white-space: nowrap;
 }
-
-.sub {
+.user-info small {
+  font-size: 10px;
   color: var(--muted);
-  margin: 0 0 1.75rem;
 }
-
+.icon-button {
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--muted);
+  min-width: 40px;
+  min-height: 40px;
+  display: inline-grid;
+  place-items: center;
+}
+.icon-button:hover {
+  background: var(--border);
+}
+.mobile-menu {
+  display: none;
+}
+main {
+  margin-left: var(--sidebar);
+  padding: 38px clamp(24px, 4vw, 64px) 56px;
+  max-width: 1700px;
+  min-width: 0;
+}
+main.narrow {
+  margin: 10vh auto;
+  padding: 32px;
+  max-width: 640px;
+}
+.page-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 32px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--border);
+}
+.eyebrow {
+  font-size: 12px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+h1 {
+  font-size: clamp(24px, 2.3vw, 34px);
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.7px;
+  margin: 0 0 8px;
+}
+h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 30px 0 16px;
+  letter-spacing: -0.3px;
+}
+h3 {
+  font-size: 16px;
+  margin: 10px 0;
+}
+.page-intro p,
+.sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.intro-mark {
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 32px;
+  color: var(--accent-soft);
+  transform: rotate(-6deg);
+  flex-shrink: 0;
+}
 .row {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-
 .grid {
   display: grid;
-  gap: 0.75rem;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
 }
-
-/* ---------- cards ---------- */
-
-.card {
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 10px;
-  padding: 1rem 1.15rem;
-  margin-bottom: 0.75rem;
-}
-
+.card,
 .stat {
   border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 10px;
-  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: 24px;
+  margin-bottom: 16px;
 }
-
+.stat {
+  margin: 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 126px;
+}
+.stat:nth-child(2) {
+  background: var(--tint-sage);
+}
+.stat:nth-child(3) {
+  background: var(--tint-peach);
+}
+.stat:nth-child(4) {
+  background: var(--tint-sand);
+}
 .stat .label {
+  font-size: 12px;
   color: var(--muted);
-  font-size: 0.8rem;
+  margin-bottom: 10px;
 }
-
 .stat .value {
-  font-size: 1.5rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-size: 28px;
+  line-height: 1.35;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+  overflow-wrap: anywhere;
 }
-
 .stat .hint {
+  font-size: 11px;
   color: var(--muted);
-  font-size: 0.78rem;
+  margin-top: 8px;
 }
-
 .name {
   font-weight: 600;
 }
-
 .detail,
 .muted {
   color: var(--muted);
-  font-size: 0.85rem;
-  word-break: break-word;
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
-
-/* ---------- forms ---------- */
-
+.service-name {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.status-page > .card {
+  padding: 24px;
+}
+.status-page > .card .detail {
+  margin-top: 12px;
+}
+.status-page > .sub {
+  margin-bottom: 20px;
+}
 label {
   display: block;
-  font-size: 0.85rem;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--muted);
-  margin-bottom: 0.25rem;
+  margin-bottom: 8px;
 }
-
 input,
 textarea,
 select {
   width: 100%;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--raised);
+  /* ขอบของตัวควบคุมบอกขอบเขตที่กดได้ จึงต้องผ่าน 3:1 ตาม WCAG 1.4.11
+   * ใช้ --border ที่ 1.43:1 เหมือนเดิมแทบมองไม่เห็นว่าช่องกรอกเริ่มตรงไหน */
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--bg);
   color: var(--fg);
-  font: inherit;
-  font-size: 0.925rem;
+  padding: 12px 14px;
+  min-height: 46px;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--placeholder);
+}
+input[type="checkbox"] {
+  min-height: 18px;
+  accent-color: var(--accent);
+}
+/* ซ่อนจากสายตาแต่ยังเข้าถึงด้วยคีย์บอร์ดและ screen reader ได้
+ * ห้ามใช้ display:none หรือ visibility:hidden — สองอันนั้นตัดออกจากลำดับ focus
+ * ทำให้คนที่ใช้คีย์บอร์ดเข้าไปถึงตัวควบคุมไม่ได้เลย */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
 }
 
-textarea {
-  resize: vertical;
-  min-height: 90px;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-}
-
-/* ปุ่มกับลิงก์ก็ต้องเห็นโฟกัส ไม่ใช่เฉพาะช่องกรอก
-   เดิมมีแค่ input/textarea/select คนที่ใช้คีย์บอร์ด (หรือเมาส์เสีย) จึงกด Tab
-   ไล่ไปทั้งหน้าโดยไม่รู้เลยว่าตอนนี้อยู่ที่ปุ่มไหน
-
-   ใช้ :focus-visible ไม่ใช่ :focus เพื่อไม่ให้ขอบเด้งขึ้นมาตอนคลิกเมาส์
-   ซึ่งเป็นเหตุผลที่หลายโปรเจกต์ไปปิด outline ทิ้งแล้วพัง a11y ไปเลย */
-a:focus-visible,
-button:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 6px;
-}
-
-.field {
-  margin-bottom: 0.9rem;
-}
-
-.btn {
-  border: 1px solid transparent;
-  background: var(--accent);
-  color: var(--accent-fg);
-  padding: 0.5rem 0.95rem;
-  border-radius: 8px;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 550;
-  cursor: pointer;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn.ghost {
-  background: transparent;
-  border-color: var(--border);
-  color: var(--fg);
-  font-weight: 450;
-}
-
-.btn.ghost:hover:not(:disabled) {
-  background: var(--border);
-}
-
-.btn-row {
+/* กล่องลากไฟล์มาวาง — แทน input[type=file] ดิบที่เบราว์เซอร์วาดปุ่ม
+ * "Choose File" กับข้อความ "No file chosen" เป็นภาษาอังกฤษด้วยสไตล์ของตัวเอง
+ * กลางหน้าจอที่เป็นไทยทั้งหมด */
+.dropzone {
   display: flex;
-  gap: 0.5rem;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 34px 20px;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+.dropzone > svg {
+  color: var(--accent);
+}
+.dropzone strong {
+  color: var(--fg);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.dropzone:hover,
+.dropzone.is-dragging {
+  background: var(--tint-sage);
+  border-color: var(--accent);
+}
+/* input ที่ซ่อนอยู่รับ focus แทนทั้งกล่อง จึงต้องวาดวงแหวนให้กล่องเอง */
+.dropzone:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+.dropzone:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.row-actions {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
 }
-
-/* ---------- table ---------- */
-
-.table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+textarea {
+  resize: vertical;
+  min-height: 130px;
 }
-
+.field {
+  margin-bottom: 18px;
+}
+.btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 11px 19px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 12px var(--shadow-accent);
+  transform: translateY(-1px);
+}
+.btn.ghost {
+  /* ปุ่มแบบนี้มีแต่ขอบบอกว่าเป็นปุ่ม ขอบจึงต้องผ่าน 3:1 */
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--fg);
+}
+.btn.ghost:hover:not(:disabled) {
+  background: var(--sunken);
+}
+.btn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.btn.danger {
+  color: var(--fail);
+}
+.password-field {
+  display: flex;
+  gap: 8px;
+}
+.password-field input {
+  min-width: 0;
+}
+.password-field .icon-button {
+  border: 1px solid var(--border);
+}
+.table-wrap {
+  overflow: auto;
+  max-height: 620px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--raised);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 13px;
 }
-
 th,
 td {
   text-align: left;
-  padding: 0.6rem 0.85rem;
+  padding: 17px 18px;
+  /* เส้นคั่นแถวเป็นการตกแต่ง ข้อมูลอยู่ที่ตัวอักษรซึ่งผ่านเกณฑ์อยู่แล้ว
+   * ไม่ใช่ขอบที่ต้องใช้ระบุตัวควบคุม จึงไม่ต้องดันไปถึง 3:1 ซึ่งจะทำให้ตารางหนักเกินจริง */
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
-
 th {
-  background: var(--card);
-  font-weight: 600;
-  font-size: 0.82rem;
+  position: sticky;
+  top: 0;
+  background: var(--th-bg);
   color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  z-index: 1;
 }
-
-tbody tr:last-child td {
-  border-bottom: none;
-}
-
 td.wrap {
   white-space: normal;
-  min-width: 220px;
+  min-width: 180px;
+  overflow-wrap: anywhere;
 }
-
-/* ---------- badges ---------- */
-
+tbody tr {
+  transition: background 0.3s;
+}
+tbody tr:hover {
+  background: var(--card);
+}
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+td .btn {
+  min-height: 36px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
 .badge {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: var(--border);
-  color: var(--fg);
-  margin-left: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--sunken);
+  margin-left: 6px;
 }
-
 .badge.ready {
   background: var(--ok-bg);
   color: var(--ok);
 }
-
 .badge.processing,
 .badge.pending {
   background: var(--warn-bg);
   color: var(--warn);
 }
-
 .badge.failed {
   background: var(--fail-bg);
   color: var(--fail);
 }
-
 .badge.admin {
   background: var(--accent);
   color: var(--accent-fg);
 }
-
 .ok {
   color: var(--ok);
   font-weight: 600;
 }
-
 .fail {
   color: var(--fail);
   font-weight: 600;
 }
-
 .alert {
-  border: 1px solid var(--fail);
+  border: 1px solid var(--alert-border);
   background: var(--fail-bg);
   color: var(--fail);
-  border-radius: 8px;
-  padding: 0.6rem 0.85rem;
-  font-size: 0.9rem;
-  margin-bottom: 0.9rem;
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
 }
-
 .alert.info {
-  border-color: var(--border);
-  background: var(--card);
+  background: var(--tint-sage);
   color: var(--fg);
+  border-color: var(--badge-ready-border);
 }
-
-/* ---------- progress ---------- */
-
 .bar {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--border);
+  height: 7px;
+  min-width: 90px;
+  border-radius: 20px;
+  background: var(--track);
+  margin-top: 10px;
   overflow: hidden;
-  margin-top: 0.4rem;
-  min-width: 120px;
 }
-
 .bar > span {
   display: block;
   height: 100%;
   background: var(--accent);
+  border-radius: 20px;
   transition: width 0.4s ease;
 }
-
-/* ---------- chat ---------- */
-
-/* แถบประวัติซ้าย + ช่องสนทนาขวา · จอแคบให้ประวัติไปอยู่ด้านบนแทนการซ่อน
-   เพราะบนมือถือผู้ใช้ก็ต้องกลับไปอ่านบทสนทนาเก่าเหมือนกัน */
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 22px 0 16px;
+}
+.search-field {
+  position: relative;
+  flex: 1;
+  max-width: 440px;
+}
+.search-field > svg {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  color: var(--muted);
+}
+.search-field input {
+  padding-left: 44px;
+}
+.toolbar select {
+  width: auto;
+}
+.empty-state {
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 24px;
+  padding: 40px 24px;
+  background: var(--card);
+}
+.empty-state > svg {
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.empty-state p {
+  max-width: 430px;
+  margin: 8px auto 22px;
+  color: var(--muted);
+}
 .chat-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 1.25rem;
-  align-items: start;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 20px;
+  height: calc(100dvh - 236px);
+  min-height: 480px;
 }
-
-@media (max-width: 760px) {
-  .chat-layout {
-    grid-template-columns: 1fr;
-  }
-
-  /* จอแคบ: จำกัดความสูงไว้ ไม่ให้รายการยาวดันช่องพิมพ์ตกจอ */
-  .session-list {
-    max-height: 30vh;
-    overflow-y: auto;
-  }
-}
-
 .session-pane {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 14px;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 24px;
+  background: var(--card);
 }
-
 .session-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  overflow: auto;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
-
 .session-item {
   display: flex;
-  align-items: stretch;
-  gap: 0.25rem;
+  align-items: center;
+  border-radius: 16px;
+  margin-bottom: 6px;
   border: 1px solid transparent;
-  border-radius: 8px;
 }
-
-.session-item:hover {
-  border-color: var(--border);
-}
-
+.session-item:hover,
 .session-item.active {
-  border-color: var(--accent);
-  background: var(--card);
+  background: var(--sunken);
 }
-
-/* ปุ่มเปิดกินพื้นที่ทั้งแถว เพื่อให้กดตรงไหนก็เปิดได้ ไม่ต้องเล็งข้อความ */
+.session-item.active {
+  border-color: var(--accent-ring);
+}
 .session-open {
   flex: 1;
   min-width: 0;
+  text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  text-align: left;
-  background: none;
+  gap: 4px;
   border: 0;
-  padding: 0.5rem 0.6rem;
-  cursor: pointer;
+  background: none;
+  padding: 12px;
   color: inherit;
-  font: inherit;
-  border-radius: 8px;
+  border-radius: 16px;
 }
-
-.session-open:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-/* หัวข้อยาวกว่าแถบให้ตัดด้วย … ไม่ให้ดันความกว้างของ grid */
 .session-title {
-  font-size: 0.85rem;
-  white-space: nowrap;
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
 }
-
 .session-meta {
-  font-size: 0.72rem;
+  font-size: 10px;
 }
-
 .session-del {
+  min-height: 40px;
+  min-width: 30px;
+  padding: 5px;
   background: none;
-  border: 0;
   color: var(--muted);
-  cursor: pointer;
-  padding: 0 0.5rem;
-  font-size: 0.8rem;
-  border-radius: 8px;
+  border: 0;
+  border-radius: 16px;
 }
-
-.session-del:hover:not(:disabled) {
-  color: #dc2626;
+.session-del:hover {
+  color: var(--fail);
+  background: var(--fail-bg);
 }
-
-.session-del:disabled {
-  cursor: default;
-  opacity: 0.4;
+.chat-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--raised);
+  overflow: hidden;
 }
-
 .chat {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  min-height: 45vh;
-  margin-bottom: 1rem;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
-
 .msg {
-  padding: 0.7rem 0.95rem;
-  border-radius: 12px;
-  max-width: 80%;
+  padding: 16px 20px;
+  max-width: 90%;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 20px;
+  font-size: 14px;
+  line-height: 1.9;
 }
-
 .msg.user {
   align-self: flex-end;
   background: var(--accent);
   color: var(--accent-fg);
+  border-bottom-right-radius: 6px;
 }
-
 .msg.assistant {
   align-self: flex-start;
   background: var(--card);
-  border: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
 }
-
 .cites {
-  font-size: 0.78rem;
+  font-size: 11px;
   color: var(--muted);
-  margin-top: 0.45rem;
-  padding-top: 0.45rem;
-  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
 }
-
-/* บอกว่าระบบยังทำงานอยู่ระหว่างรอ token แรก ซึ่งใช้เวลา 15-37 วินาที */
+.cites .btn {
+  min-height: 34px;
+  font-size: 11px;
+  padding: 6px 10px;
+}
 .working {
-  color: var(--muted);
-  font-size: 0.85rem;
   display: flex;
+  gap: 8px;
   align-items: center;
-  gap: 0.4rem;
   flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
 }
-
 .dots {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--accent);
-  animation: pulse 1.2s ease-in-out infinite;
-  flex: none;
+  animation: pulse 1.5s ease infinite;
 }
-
 @keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.25;
-    transform: scale(0.8);
-  }
   50% {
-    opacity: 1;
-    transform: scale(1.15);
+    opacity: 0.3;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .dots {
-    animation: none;
-    opacity: 0.7;
-  }
-}
-
 .composer {
   display: flex;
-  gap: 0.5rem;
+  gap: 10px;
+  padding: 16px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
 }
-
-code {
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  font-size: 0.85em;
-  background: var(--border);
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-}
-
-pre.chunk {
-  white-space: pre-wrap;
-  font-size: 0.82rem;
+.composer input {
+  min-width: 0;
   background: var(--raised);
+}
+.composer .btn {
+  min-width: 52px;
+}
+.history-toggle {
+  display: none;
+}
+.chat-empty {
+  margin: auto 0;
+  text-align: center;
+  padding: 20px 4px;
+}
+.chat-empty .empty-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  border-radius: 24px;
+  background: var(--tint-sage);
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.chat-empty p {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 340px;
+  margin: 8px auto 20px;
+}
+.suggestions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.6rem 0.75rem;
-  margin: 0.5rem 0 0;
-  max-height: 220px;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 14px;
+  border-radius: 16px;
+  font-size: 12px;
+}
+.suggestion:hover {
+  background: var(--tint-sage);
+}
+.suggestion svg {
+  color: var(--accent);
+}
+code {
+  font-family: Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--sunken);
+  border-radius: 6px;
+  padding: 2px 5px;
+}
+pre.chunk {
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  max-height: 260px;
   overflow: auto;
+}
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 0 0 24px;
+}
+.guide-item {
+  display: flex;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  background: var(--tint-sage);
+}
+.guide-item:nth-child(2) {
+  background: var(--tint-peach);
+}
+.guide-item:nth-child(3) {
+  background: var(--tint-sand);
+}
+.guide-item svg {
+  color: var(--accent);
+  margin-top: 3px;
+}
+.guide-item strong {
+  display: block;
+  font-size: 12px;
+}
+.guide-item p {
+  font-size: 11px;
+  margin: 5px 0 0;
+  color: var(--muted);
+}
+details.help {
+  border: 1px solid var(--border);
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: var(--card);
+  margin: 16px 0;
+}
+details.help summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+details.help p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.login-layout {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100dvh;
+  margin: 0;
+  max-width: none;
+  padding: 0;
+}
+.login-story {
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: clamp(36px, 6vw, 90px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.login-story .brand {
+  position: relative;
+  z-index: 1;
+}
+.login-story .brand small {
+  color: var(--on-accent-muted);
+}
+.login-story .brand-icon {
+  background: var(--accent-soft);
+  color: var(--accent-fg);
+}
+.login-story h2 {
+  font-size: clamp(30px, 3.6vw, 54px);
+  font-weight: 500;
+  line-height: 1.45;
+  max-width: 490px;
+  margin: 62px 0 22px;
+  letter-spacing: -1.4px;
+}
+.login-story > p {
+  max-width: 400px;
+  color: var(--on-accent-muted);
+}
+.story-steps {
+  margin-top: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.story-steps span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--accent-soft);
+  padding: 12px 15px;
+  border-radius: 16px;
+  font-size: 12px;
+}
+.login-panel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  position: relative;
+}
+.login-theme {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+.login-panel > div {
+  width: 100%;
+  max-width: 420px;
+}
+.login-panel h1 {
+  font-size: 30px;
+}
+.login-panel .sub {
+  margin-bottom: 32px;
+}
+.login-panel .card {
+  padding: 30px;
+  background: var(--raised);
+}
+.login-panel .btn[type="submit"] {
+  width: 100%;
+  margin-top: 12px;
+}
+.login-note {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+.loading-card {
+  min-height: 160px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--card);
+}
+@media (min-width: 1600px) {
+  main {
+    margin-right: auto;
+  }
+}
+@media (max-height: 760px) and (min-width: 1001px) {
+  .nav-guide {
+    display: none;
+  }
+  .nav-user {
+    margin-top: auto;
+  }
+  .chat-layout {
+    height: calc(100dvh - 210px);
+    min-height: 400px;
+  }
+}
+@media (max-width: 1100px) {
+  :root {
+    --sidebar: 220px;
+  }
+  .nav {
+    padding: 24px 14px;
+  }
+  .guide-grid {
+    gap: 10px;
+  }
+  .guide-item {
+    padding: 14px;
+  }
+  .chat-layout {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+  .intro-mark {
+    display: none;
+  }
+}
+@media (max-width: 1000px) {
+  :root {
+    --sidebar: 0px;
+  }
+  .nav {
+    position: sticky;
+    inset: 0 0 auto;
+    width: 100%;
+    padding: 12px 20px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    min-height: 76px;
+  }
+  .mobile-menu {
+    display: inline-grid;
+  }
+  .brand {
+    font-size: 16px;
+  }
+  .brand-icon {
+    width: 36px;
+    height: 42px;
+  }
+  .nav-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--sunken);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px 20px;
+    max-height: calc(100dvh - 76px);
+    overflow: auto;
+  }
+  .nav-content.is-open {
+    display: flex;
+  }
+  .nav-caption {
+    margin: 4px 14px 12px;
+  }
+  .nav-guide {
+    display: none;
+  }
+  .nav-user {
+    margin-top: 18px;
+  }
+  .user-info strong {
+    font-size: 12px;
+  }
+  .nav-link {
+    min-height: 46px;
+  }
+  .page-intro {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+  }
+  main {
+    padding: 24px;
+  }
+  .chat-layout {
+    height: calc(100dvh - 250px);
+  }
+  .login-story {
+    padding: 36px;
+  }
+  .login-panel {
+    padding: 32px;
+  }
+}
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+  main {
+    padding: 22px 16px 28px;
+  }
+  h1 {
+    font-size: 24px;
+  }
+  .page-intro {
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+  .page-intro p {
+    font-size: 12px;
+  }
+  .eyebrow {
+    font-size: 11px;
+  }
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .stat {
+    padding: 16px;
+    min-height: 118px;
+  }
+  .stat .value {
+    font-size: 24px;
+  }
+  .card {
+    padding: 20px;
+  }
+  .card .grid {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .toolbar .search-field {
+    min-width: 180px;
+    max-width: none;
+  }
+  .toolbar select {
+    flex: 1;
+  }
+  .guide-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .guide-item {
+    padding: 14px;
+  }
+  .guide-item p {
+    margin-top: 2px;
+  }
+  .guide-item strong {
+    font-size: 12px;
+  }
+  .chat-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: calc(100dvh - 254px);
+    min-height: 380px;
+    position: relative;
+  }
+  .history-toggle {
+    display: flex;
+    align-self: flex-start;
+    min-height: 40px;
+  }
+  .session-pane {
+    display: none;
+    position: absolute;
+    top: 50px;
+    left: 0;
+    right: 0;
+    max-height: 70%;
+    z-index: 5;
+    box-shadow: 0 12px 25px var(--shadow-drop);
+    background: var(--sunken);
+  }
+  .session-pane.is-open {
+    display: flex;
+  }
+  .chat-main {
+    flex: 1;
+  }
+  .chat {
+    padding: 16px;
+    gap: 14px;
+  }
+  .msg {
+    max-width: 96%;
+    padding: 14px;
+    font-size: 13px;
+  }
+  .composer {
+    padding: 10px;
+    gap: 8px;
+  }
+  .composer input {
+    font-size: 16px;
+  }
+  .suggestions {
+    grid-template-columns: 1fr;
+  }
+  .chat-empty {
+    padding: 6px 0;
+  }
+  .chat-empty h2 {
+    font-size: 18px;
+    margin: 8px 0;
+  }
+  .chat-empty .empty-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+    margin-bottom: 0;
+  }
+  .chat-empty p {
+    margin-bottom: 14px;
+  }
+  .suggestion {
+    padding: 10px;
+    min-height: 44px;
+  }
+  .login-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .login-story {
+    padding: 26px;
+  }
+  .login-story h2 {
+    font-size: 28px;
+    margin: 25px 0 12px;
+  }
+  .login-story > p {
+    font-size: 12px;
+  }
+  .story-steps {
+    display: none;
+  }
+  .login-panel {
+    padding: 26px 20px;
+  }
+  .login-panel .card {
+    padding: 22px;
+  }
+  main.narrow {
+    margin: 6vh 16px;
+    padding: 16px;
+  }
+  .row > div {
+    min-width: 0;
+  }
+  .table-wrap {
+    max-height: 520px;
+  }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  th,
+  td {
+    padding: 14px;
+  }
+  .nav {
+    padding: 10px 16px;
+  }
+  .stat .hint {
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Keep the composer inside the viewport, including shorter mobile screens. */
+main:has(.chat-layout) {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 24px;
+}
+main:has(.chat-layout) .page-intro {
+  flex-shrink: 0;
+}
+main:has(.chat-layout) .chat-layout {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+@media (max-width: 1000px) {
+  main:has(.chat-layout) {
+    height: calc(100dvh - 76px);
+  }
+}
+@media (max-width: 640px) {
+  main:has(.chat-layout) {
+    padding-bottom: 12px;
+  }
+  .history-toggle {
+    flex-shrink: 0;
+  }
+}
+
+/* ==========================================================================
+ * โหมดมืด
+ *
+ * นิยาม token ชุดเดิมใหม่ทั้งชุด ไม่แก้กฎไหนเลย — ทำได้เพราะทุกสีในไฟล์นี้
+ * มาจาก token แล้ว ถ้ามีกฎไหนเขียน hex ตรง ๆ กฎนั้นจะค้างสว่างอยู่ในโหมดมืด
+ *
+ * ทุกคู่สีตรวจด้วยสูตร WCAG จริงแล้ว ตัวเลขกำกับไว้ข้างค่า
+ * ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --raised: #343029;
+    --bg: #22201a;
+    --card: #2b2822;
+    --th-bg: #302c25;
+    --sunken: #1b1915;
+    --track: #3a352c;
+    --surface-hover: #3a352c;
+
+    --fg: #ece2d0; /* 12.68 บน --bg · 11.44 บน --card */
+    --muted: #b3a891; /* 6.92 บน --bg · 6.25 บน --card · 7.46 บน --sunken */
+    --placeholder: #958c7c;
+
+    --border: #4a4437;
+    --border-strong: #7f7560; /* 3.58 บน --bg · 3.23 บน --card */
+
+    --accent: #a3b06a; /* 6.96 บน --bg */
+    --accent-fg: #1e2212; /* 6.94 บน --accent */
+    --accent-hover: #b6c37d;
+    --accent-soft: #6f7d4e;
+    --accent-ring: #8d9a5c;
+    --on-accent-muted: #2f3520;
+    --active-dot: #2f3520; /* จุดบนพื้น accent ที่สว่างแล้ว ต้องกลับเป็นสีเข้ม */
+    --avatar-bg: #7d5c42;
+
+    --ok: #b7cf8e;
+    --ok-bg: #313a22; /* 7.01 */
+    --warn: #e8b86a;
+    --warn-bg: #3d2d14; /* 7.26 */
+    --fail: #e9a08a;
+    --fail-bg: #40231a; /* 6.69 */
+    --alert-border: #8a5a46;
+    --badge-ready-border: #5f6a42;
+
+    --tint-sage: #2f3527;
+    --tint-peach: #3a2e24;
+    --tint-sand: #37301f;
+
+    --focus: #e0a878; /* 7.79 บน --bg */
+    --shadow-accent: #00000040;
+    --shadow-drop: #00000059;
+    /* noise สีดำบนพื้นมืดมองไม่เห็น ต้องสลับเป็นสีขาวแล้วลดความเข้มลง */
+    --noise-opacity: 0.035;
+  }
+
+  /* url() ไม่รับ var() จึงต้องเขียนทับทั้งเส้น — ต่างกันแค่ fill */
+  :root:not([data-theme="light"]) body:before {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23n)' opacity='.18' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+  }
+}
+
+/* เลือกโหมดเองได้โดยไม่ต้องไปแก้ค่าของเครื่อง — มีประโยชน์ตอนสาธิตให้คนอื่นดู
+ * ค่าเหล่านี้ต้องตรงกับบล็อกข้างบนเสมอ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --raised: #343029;
+  --bg: #22201a;
+  --card: #2b2822;
+  --th-bg: #302c25;
+  --sunken: #1b1915;
+  --track: #3a352c;
+  --surface-hover: #3a352c;
+
+  --fg: #ece2d0;
+  --muted: #b3a891;
+  --placeholder: #958c7c;
+
+  --border: #4a4437;
+  --border-strong: #7f7560;
+
+  --accent: #a3b06a;
+  --accent-fg: #1e2212;
+  --accent-hover: #b6c37d;
+  --accent-soft: #6f7d4e;
+  --accent-ring: #8d9a5c;
+  --on-accent-muted: #2f3520;
+  --active-dot: #2f3520;
+  --avatar-bg: #7d5c42;
+
+  --ok: #b7cf8e;
+  --ok-bg: #313a22;
+  --warn: #e8b86a;
+  --warn-bg: #3d2d14;
+  --fail: #e9a08a;
+  --fail-bg: #40231a;
+  --alert-border: #8a5a46;
+  --badge-ready-border: #5f6a42;
+
+  --tint-sage: #2f3527;
+  --tint-peach: #3a2e24;
+  --tint-sand: #37301f;
+
+  --focus: #e0a878;
+  --shadow-accent: #00000040;
+  --shadow-drop: #00000059;
+  --noise-opacity: 0.035;
+}
+
+:root[data-theme="dark"] body:before {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23n)' opacity='.18' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
 }

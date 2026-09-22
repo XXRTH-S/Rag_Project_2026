@@ -155,6 +155,14 @@ async def client(session: AsyncSession) -> AsyncGenerator:
     """ยิง HTTP ใส่ app จริงผ่าน ASGI โดยไม่ต้องเปิดพอร์ต
 
     ไม่รัน lifespan ตั้งใจ — ไม่งั้น ensure_admin_user จะไปเขียน database ตัวจริง
+
+    base_url เป็น https ไม่ใช่ http — จงใจ · login ตั้ง cookie ด้วยแฟล็ก Secure
+    เมื่อ COOKIE_SECURE=true ซึ่งเป็นค่าที่ใช้จริงตอนขึ้น HTTPS และ cookie แบบนั้น
+    client จะไม่ส่งกลับผ่าน http เด็ดขาด เทสที่พึ่ง cookie จึงล้มทั้งชุดทั้งที่โค้ดไม่ผิด
+    (เจอจริง: https override ตั้ง COOKIE_SECURE=true แล้วเทสในคอนเทนเนอร์เดียวกันแดง)
+
+    ยิงผ่าน https ทำให้เทสผ่านทั้งสองค่า และเดินเส้นทางเดียวกับ production
+    แทนที่จะเป็นเส้นทาง http ที่ไม่มีใครใช้จริง — แก้ที่เหตุ ไม่ใช่ตรึงค่า setting ทับไว้
     """
     from httpx import ASGITransport, AsyncClient
 
@@ -164,7 +172,7 @@ async def client(session: AsyncSession) -> AsyncGenerator:
     app.dependency_overrides[get_session] = lambda: session
     try:
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://testserver"
+            transport=ASGITransport(app=app), base_url="https://testserver"
         ) as c:
             yield c
     finally:

@@ -2,13 +2,18 @@
 
 import { useEffect, useState } from "react";
 
+import { PageIntro } from "@/components/PageIntro";
+import { Icon } from "@/components/Icon";
 import { Nav } from "@/components/Nav";
-import { API_BASE, api, type Me } from "@/lib/api";
+import { API_BASE, apiFetch, api, type Me } from "@/lib/api";
 
 type Check = { ok: boolean; detail?: string | null; [k: string]: unknown };
+
+// tier และ gpu มาเฉพาะเมื่อผู้เรียกเป็น admin — /health/deep ตอบได้โดยไม่ต้องล็อกอิน
+// (monitor ภายนอกต้องเรียกได้) แต่ไม่แจกรุ่นซอฟต์แวร์กับชื่อโมเดลให้คนที่ไม่ใช่ admin
 type DeepHealth = {
   status: string;
-  tier: string;
+  tier?: string;
   checks: Record<string, Check>;
   gpu?: { loaded_models?: string; warning?: string };
 };
@@ -35,7 +40,7 @@ export default function StatusPage() {
   useEffect(() => {
     // /health/deep ตอบ 503 ตอน degraded ซึ่งถูกต้อง จึงอ่าน body เองแทนการโยน error
     const load = () =>
-      fetch(`${API_BASE}/health/deep`, { credentials: "include" })
+      apiFetch(`${API_BASE}/health/deep`, { credentials: "include" })
         .then((r) => r.json())
         .then((d) => {
           setHealth(d);
@@ -83,10 +88,16 @@ export default function StatusPage() {
   return (
     <>
       <Nav user={user} />
-      <main>
-        <h1>สถานะระบบ</h1>
+      <main id="main-content" className="workspace status-page">
+        <PageIntro />
+
         <p className="sub">
-          tier <code>{health?.tier ?? "—"}</code> · อัปเดตทุก 10 วินาที
+          {health?.tier ? (
+            <>
+              tier <code>{health.tier}</code> ·{" "}
+            </>
+          ) : null}
+          อัปเดตทุก 10 วินาที
         </p>
 
         {error && (
@@ -98,11 +109,31 @@ export default function StatusPage() {
           </div>
         )}
 
+        {health && (
+          <div className="grid">
+            <div className="stat">
+              <div className="label">บริการที่พร้อมใช้งาน</div>
+              <div className="value">
+                {Object.values(health.checks).filter((c) => c.ok).length} /{" "}
+                {Object.keys(health.checks).length}
+              </div>
+            </div>
+            <div className="stat">
+              <div className="label">บริการที่ควรตรวจสอบ</div>
+              <div className="value">
+                {Object.values(health.checks).filter((c) => !c.ok).length}
+              </div>
+            </div>
+          </div>
+        )}
         {health &&
           Object.entries(health.checks).map(([key, check]) => (
             <div className="card" key={key}>
               <div className="row">
-                <span className="name">{LABELS[key] ?? key}</span>
+                <span className="name service-name">
+                  <Icon name={key === "llm" ? "chat" : "status"} />
+                  {LABELS[key] ?? key}
+                </span>
                 <span className={check.ok ? "ok" : "fail"}>
                   {check.ok ? "พร้อม" : "ยังไม่พร้อม"}
                 </span>
@@ -119,10 +150,22 @@ export default function StatusPage() {
                 {health.gpu.warning ? "หล่นไป CPU" : "ปกติ"}
               </span>
             </div>
-            <div className="detail">{health.gpu.loaded_models ?? "—"}</div>
+            <div className="detail">
+              {health.gpu.loaded_models === "no model loaded"
+                ? "ยังไม่มีโมเดลอยู่ในหน่วยความจำ โมเดลจะโหลดเมื่อมีคำขอ"
+                : (health.gpu.loaded_models ?? "ยังไม่มีข้อมูล")}
+            </div>
             {health.gpu.warning ? <div className="detail fail">{health.gpu.warning}</div> : null}
           </div>
         )}
+        <details className="help">
+          <summary>สถานะเหล่านี้หมายถึงอะไร?</summary>
+          <p>
+            ฐานข้อมูลเก็บเอกสารและประวัติ Redis จัดคิวงาน ส่วน OCR อ่านหน้าสแกน Embeddings
+            ช่วยค้นข้อมูล และ LLM เรียบเรียงคำตอบ สถานะพร้อมหมายถึงบริการตอบการตรวจสอบได้
+            ไม่ใช่การรับรองคุณภาพคำตอบ
+          </p>
+        </details>
       </main>
     </>
   );

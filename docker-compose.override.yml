@@ -4,6 +4,10 @@ services:
   api:
     build:
       target: dev
+    environment:
+      # /docs จำเป็นกับการต่อ frontend ตอน dev — เปิดที่นี่ที่เดียว
+      # ไฟล์นี้ใช้เฉพาะเครื่องนักพัฒนา การเปิดจึงไม่ตามไปถึง deployment ไหน
+      API_DOCS_ENABLED: "true"
     volumes:
       - ./api:/app
       - uploads:/data/uploads

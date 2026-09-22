@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_session
-from app.core.deps import require_admin
+from app.core.deps import require_admin, require_ingestion
 from app.ingestion import queue as ingest_queue
 from app.ingestion.detect import plan_document
 from app.models.document import Chunk, Document, IngestionJob
@@ -41,7 +41,12 @@ class BulkResult(BaseModel):
     rejected: list[dict]
 
 
-@router.post("/{document_id}/reprocess", response_model=JobOut, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/{document_id}/reprocess",
+    response_model=JobOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_ingestion)],
+)
 async def reprocess_document(
     document_id: uuid.UUID,
     payload: ReprocessRequest,
@@ -132,7 +137,12 @@ async def reprocess_document(
     return job
 
 
-@router.post("/bulk", response_model=BulkResult, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/bulk",
+    response_model=BulkResult,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_ingestion)],
+)
 async def bulk_upload(
     files: list[UploadFile] = File(...),
     collection: str = Query("default", max_length=64),

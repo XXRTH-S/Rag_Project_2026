@@ -3,6 +3,7 @@
 import type { Me } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
+import { PageIntro } from "./PageIntro";
 import { Nav } from "./Nav";
 
 /** ห่อทุกหน้าที่ต้องล็อกอิน — เช็คสิทธิ์ก่อนแล้วค่อย render เนื้อหา */
@@ -19,7 +20,7 @@ export function Shell({
     return (
       <>
         <Nav user={null} />
-        <main>
+        <main id="main-content">
           <p className="muted">กำลังโหลด…</p>
         </main>
       </>
@@ -30,7 +31,7 @@ export function Shell({
     return (
       <>
         <Nav user={null} />
-        <main>
+        <main id="main-content">
           <div className="alert" role="alert">
             ต่อ API ไม่ได้ ตรวจว่า backend ทำงานอยู่ด้วย <code>.\dc.ps1 logs -f api</code>
           </div>
@@ -42,7 +43,10 @@ export function Shell({
   return (
     <>
       <Nav user={user} />
-      <main>{children(user)}</main>
+      <main id="main-content" className="workspace">
+        <PageIntro />
+        {children(user)}
+      </main>
     </>
   );
 }

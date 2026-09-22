@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import get_current_user
 from app.llm import orchestrator
-from app.models.chat import ChatMessage, Feedback
+from app.models.chat import ChatMessage, ChatSession, Feedback
 from app.models.user import User
 from app.schemas.base import StrictModel
 
@@ -54,14 +54,18 @@ async def chat(
         subject=str(user.id),
     )
 
-    chat_session = await orchestrator.ensure_session(
-        session,
-        payload.session_id,
-        channel="widget",
-        user_id=user.id,
-        user_agent=request.headers.get("user-agent"),
-        client_ip=request.client.host if request.client else None,
-    )
+    try:
+        chat_session = await orchestrator.ensure_session(
+            session,
+            payload.session_id,
+            channel="widget",
+            user_id=user.id,
+            user_agent=request.headers.get("user-agent"),
+            client_ip=request.client.host if request.client else None,
+        )
+    except orchestrator.SessionNotOwned as exc:
+        # 404 ไม่ใช่ 403 ให้ตรงกับที่เหลือทั้งระบบ — 403 เท่ากับยืนยันว่า id มีอยู่จริง
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "ไม่พบบทสนทนา") from exc
     await session.commit()
 
     # admin เห็นทุกเอกสาร ส่วน user เห็นเฉพาะของตัวเอง — กรองที่ระดับ SQL
@@ -113,7 +117,8 @@ async def submit_feedback(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "rating ต้องเป็น 1 หรือ -1")
 
     message = await session.get(ChatMessage, payload.message_id)
-    if message is None:
+    owner = await session.get(ChatSession, message.session_id) if message else None
+    if message is None or owner is None or owner.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "ไม่พบข้อความ")
 
     session.add(

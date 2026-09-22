@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Icon } from "@/components/Icon";
 import { Shell } from "@/components/Shell";
 import { api, formatDateTime, type Me } from "@/lib/api";
 
@@ -12,6 +13,8 @@ type UserRow = Me & {
 };
 
 function UsersInner({ me }: { me: Me }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [query, setQuery] = useState("");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -89,14 +92,34 @@ function UsersInner({ me }: { me: Me }) {
 
   return (
     <>
-      <h1>ผู้ใช้</h1>
-      <p className="sub">
-        ระบบไม่มีหน้าสมัครสมาชิกสาธารณะ — คลังความรู้เป็นเอกสารภายใน บัญชีต้องสร้างโดย admin
-      </p>
+      {error && (
+        <div className="alert" role="alert">
+          {error}
+        </div>
+      )}
+      {notice && (
+        <div className="alert info" role="status">
+          {notice}
+        </div>
+      )}
 
-      {error && <div className="alert" role="alert">{error}</div>}
-      {notice && <div className="alert info" role="status">{notice}</div>}
-
+      <div className="grid">
+        <div className="stat">
+          <div className="label">สมาชิกทั้งหมด</div>
+          <div className="value">{users.length}</div>
+        </div>
+        <div className="stat">
+          <div className="label">บัญชีที่ใช้งานได้</div>
+          <div className="value">{users.filter((u) => u.is_active).length}</div>
+        </div>
+        <div className="stat">
+          <div className="label">ผู้ดูแลระบบ</div>
+          <div className="value">{users.filter((u) => u.role === "admin").length}</div>
+        </div>
+      </div>
+      <h2>
+        <Icon name="users" /> เพิ่มสมาชิกในพื้นที่ทำงาน
+      </h2>
       <form className="card" onSubmit={create}>
         <div className="grid">
           <div className="field">
@@ -111,14 +134,25 @@ function UsersInner({ me }: { me: Me }) {
           </div>
           <div className="field">
             <label htmlFor="password">รหัสผ่าน (อย่างน้อย 8 ตัว)</label>
-            <input
-              id="password"
-              type="text"
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="password-field">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                <Icon name="eye" />
+              </button>
+            </div>
           </div>
           <div className="field">
             <label htmlFor="role">สิทธิ์</label>
@@ -137,7 +171,18 @@ function UsersInner({ me }: { me: Me }) {
         </button>
       </form>
 
-      <h2>รายชื่อ ({users.length})</h2>
+      <div className="toolbar">
+        <h2 style={{ margin: 0 }}>รายชื่อสมาชิก</h2>
+        <div className="search-field">
+          <Icon name="search" size={18} />
+          <input
+            aria-label="ค้นหาสมาชิก"
+            placeholder="ค้นหาด้วยอีเมล"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
@@ -151,71 +196,81 @@ function UsersInner({ me }: { me: Me }) {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => {
-              const isSelf = user.id === me.id;
-              return (
-                <tr key={user.id}>
-                  <td className="wrap">
-                    {user.email}
-                    {isSelf && <span className="badge">คุณ</span>}
-                  </td>
-                  <td>
-                    {user.role}
-                    {user.quota_unlimited && <span className="badge">ไม่จำกัด</span>}
-                  </td>
-                  <td>
-                    {user.is_active ? (
-                      <span className="badge ready">ใช้งานได้</span>
-                    ) : (
-                      <span className="badge failed">ปิดอยู่</span>
-                    )}
-                  </td>
-                  <td>
-                    {user.documents_today} เอกสาร · {user.pages_today} หน้า
-                  </td>
-                  <td>{formatDateTime(user.created_at)}</td>
-                  <td>
-                    <div className="btn-row">
-                      <button className="btn ghost" onClick={() => resetPassword(user)}>
-                        ตั้งรหัสใหม่
-                      </button>
-                      {/* ปุ่มที่ล็อกตัวเองออกจากระบบได้ ไม่ควรมีให้กดตั้งแต่แรก */}
-                      {!isSelf && (
-                        <>
-                          <button
-                            className="btn ghost"
-                            onClick={() =>
-                              patch(
-                                user,
-                                { is_active: !user.is_active },
-                                user.is_active ? "ปิดบัญชี" : "เปิดบัญชี",
-                              )
-                            }
-                          >
-                            {user.is_active ? "ปิดบัญชี" : "เปิดบัญชี"}
-                          </button>
-                          <button
-                            className="btn ghost"
-                            onClick={() =>
-                              patch(
-                                user,
-                                { role: user.role === "admin" ? "user" : "admin" },
-                                "เปลี่ยนสิทธิ์",
-                              )
-                            }
-                          >
-                            {user.role === "admin" ? "ลดเป็น user" : "ตั้งเป็น admin"}
-                          </button>
-                          <button className="btn ghost" onClick={() => remove(user)}>
-                            ลบ
-                          </button>
-                        </>
+            {users.filter((u) => u.email.toLowerCase().includes(query.toLowerCase())).length ===
+              0 && (
+              <tr>
+                <td colSpan={6} className="muted">
+                  ไม่พบสมาชิกที่ตรงกับคำค้น
+                </td>
+              </tr>
+            )}
+            {users
+              .filter((u) => u.email.toLowerCase().includes(query.toLowerCase()))
+              .map((user) => {
+                const isSelf = user.id === me.id;
+                return (
+                  <tr key={user.id}>
+                    <td className="wrap">
+                      {user.email}
+                      {isSelf && <span className="badge">คุณ</span>}
+                    </td>
+                    <td>
+                      {user.role}
+                      {user.quota_unlimited && <span className="badge">ไม่จำกัด</span>}
+                    </td>
+                    <td>
+                      {user.is_active ? (
+                        <span className="badge ready">ใช้งานได้</span>
+                      ) : (
+                        <span className="badge failed">ปิดอยู่</span>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+                    </td>
+                    <td>
+                      {user.documents_today} เอกสาร · {user.pages_today} หน้า
+                    </td>
+                    <td>{formatDateTime(user.created_at)}</td>
+                    <td>
+                      <div className="btn-row">
+                        <button className="btn ghost" onClick={() => resetPassword(user)}>
+                          ตั้งรหัสใหม่
+                        </button>
+                        {/* ปุ่มที่ล็อกตัวเองออกจากระบบได้ ไม่ควรมีให้กดตั้งแต่แรก */}
+                        {!isSelf && (
+                          <>
+                            <button
+                              className="btn ghost"
+                              onClick={() =>
+                                patch(
+                                  user,
+                                  { is_active: !user.is_active },
+                                  user.is_active ? "ปิดบัญชี" : "เปิดบัญชี",
+                                )
+                              }
+                            >
+                              {user.is_active ? "ปิดบัญชี" : "เปิดบัญชี"}
+                            </button>
+                            <button
+                              className="btn ghost"
+                              onClick={() =>
+                                patch(
+                                  user,
+                                  { role: user.role === "admin" ? "user" : "admin" },
+                                  "เปลี่ยนสิทธิ์",
+                                )
+                              }
+                            >
+                              {user.role === "admin" ? "ลดเป็น user" : "ตั้งเป็น admin"}
+                            </button>
+                            <button className="btn ghost danger" onClick={() => remove(user)}>
+                              ลบ
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>

@@ -3,6 +3,12 @@
 // ตั้ง NEXT_PUBLIC_API_URL เมื่อต้องการยิงตรงไปที่ :8000 ตอน dev
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("ngrok-skip-browser-warning", "1");
+  return fetch(input, { ...init, headers });
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -19,7 +25,7 @@ async function parseBody(res: Response): Promise<unknown> {
   try {
     return JSON.parse(text);
   } catch {
-    return text;
+    throw new ApiError(res.status, "ขณะนี้ไม่สามารถเชื่อมต่อบริการได้ กรุณาติดต่อผู้ดูแลระบบ");
   }
 }
 
@@ -35,7 +41,7 @@ function messageFrom(body: unknown, fallback: string): string {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await apiFetch(`${API_BASE}${path}`, {
     ...init,
     credentials: "include",
     headers: {
@@ -166,9 +172,27 @@ export function formatDuration(seconds: number): string {
   return `${(minutes / 60).toFixed(1)} ชั่วโมง`;
 }
 
+/** วันที่พร้อมเวลา เช่น "9 ก.ย. 2569 15:59"
+ *
+ * ใช้ medium ไม่ใช่ short · short ของ th-TH ให้ "9/9/69" ซึ่งปีพุทธศักราชสองหลัก
+ * อ่านแล้วสับสนกับ ค.ศ. และเดือนกับวันสลับกันได้ในสายตาคนที่ชินกับรูปแบบอื่น
+ */
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString("th-TH", {
-    dateStyle: "short",
+    dateStyle: "medium",
     timeStyle: "short",
+  });
+}
+
+/** วันที่อย่างเดียว เช่น "9 ก.ย. 2569" — ใช้ที่ที่พื้นที่จำกัดอย่างรายการบทสนทนา
+ *
+ * อยู่ที่นี่เพื่อให้ทุกหน้าจัดรูปแบบวันที่เหมือนกัน ก่อนหน้านี้หน้าแชทเรียก
+ * toLocaleDateString เองแยกต่างหาก ซึ่งจะเพี้ยนไปคนละแบบเมื่อแก้ที่เดียว
+ */
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 }

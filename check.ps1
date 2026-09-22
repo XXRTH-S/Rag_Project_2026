@@ -54,8 +54,14 @@ function Show-Status {
             $color = if ($c.ok) { 'Green' } else { 'Red' }
             Write-Host ("  {0} {1,-12} {2}" -f $mark, $k, $c.detail) -ForegroundColor $color
         }
-        Write-Host "  gpu: $($h.gpu.loaded_models)"
-        if ($h.gpu.warning) { Write-Host "  $($h.gpu.warning)" -ForegroundColor Red }
+        # /health/deep แจกรายละเอียด (รุ่น ชื่อโมเดล สถานะ GPU) เฉพาะ admin
+        # สคริปต์นี้ยิงโดยไม่ล็อกอิน จึงได้แค่เขียว/แดง ซึ่งพอสำหรับการเช็คว่าระบบขึ้นครบ
+        if ($h.gpu) {
+            Write-Host "  gpu: $($h.gpu.loaded_models)"
+            if ($h.gpu.warning) { Write-Host "  $($h.gpu.warning)" -ForegroundColor Red }
+        } else {
+            Write-Host "  (รายละเอียดและสถานะ GPU ดูที่หน้า /status ด้วยบัญชี admin)" -ForegroundColor DarkGray
+        }
     }
 }
 

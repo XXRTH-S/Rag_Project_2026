@@ -80,6 +80,14 @@ async def retrieve(
     )
 
 
+class SessionNotOwned(Exception):
+    """ขอต่อบทสนทนาที่มีอยู่จริง แต่ไม่ใช่ของผู้เรียก
+
+    router ต้องแปลงเป็น 404 ไม่ใช่ 403 — 403 เท่ากับยืนยันว่า id นี้มีอยู่จริง
+    ซึ่งทำให้ไล่เดาได้ว่าใครคุยอะไรไว้บ้าง
+    """
+
+
 async def ensure_session(
     session: AsyncSession,
     session_id: uuid.UUID | None,
@@ -92,6 +100,15 @@ async def ensure_session(
     if session_id is not None:
         existing = await session.get(ChatSession, session_id)
         if existing is not None:
+            # ต้องเช็คเจ้าของก่อนคืน · ก่อนหน้านี้คืนให้ใครก็ได้ที่ส่ง id มาถูก
+            # ซึ่งเปิดช่องสองทาง: เขียนข้อความลงบทสนทนาของคนอื่น และที่หนักกว่าคือ
+            # อ่านของเขาได้ เพราะ stream_answer เอา _recent_history ของ session นั้น
+            # ใส่เข้า prompt ถามว่า "สรุปบทสนทนาก่อนหน้า" ก็ได้เนื้อหาของคนอื่นกลับมา
+            #
+            # id เป็น UUIDv4 จึงเดาไม่ได้ตรง ๆ แต่มันหลุดได้ทั้งจาก log ภาพหน้าจอ
+            # และลิงก์ที่แชร์กัน — ความลับของ id ไม่ใช่การควบคุมสิทธิ์
+            if existing.user_id != user_id:
+                raise SessionNotOwned
             return existing
 
     chat_session = ChatSession(
@@ -104,6 +121,50 @@ async def ensure_session(
     session.add(chat_session)
     await session.flush()
     return chat_session
+
+
+# หัวข้อยาวกว่านี้ก็ล้นแถบข้างอยู่ดี · ตรงกับความยาวของคอลัมน์ใน migration 0005
+TITLE_MAX_CHARS = 120
+
+# คำทักทายและคำลองระบบ — ข้อความที่มีแค่คำพวกนี้ไม่บอกว่าคุยเรื่องอะไร
+# บทสนทนาที่ขึ้นต้นแบบนี้ให้รอคำถามจริงของผู้ใช้แทน
+_GREETINGS = {
+    "hi", "hello", "hey", "test", "testing", "ping", "ok",
+    "สวัสดี", "สวัสดีครับ", "สวัสดีค่ะ", "หวัดดี", "ทดสอบ", "ทดลอง",
+}
+
+
+def derive_title(question: str) -> str | None:
+    """หัวข้อของบทสนทนาจากคำถามแรก · คืน None เมื่อยังตั้งหัวข้อไม่ได้
+
+    คืน None เมื่อเป็นคำทักทายล้วน ๆ เพื่อให้คำถามถัดไปได้ตั้งหัวข้อแทน —
+    แถบข้างที่เต็มไปด้วย "hi" ซ้ำ ๆ ไม่ช่วยให้ใครหาบทสนทนาเก่าเจอ
+
+    ตัดตามขอบคำด้วยตัวตัดคำไทย ไม่ใช่ตัดที่ตัวอักษรที่ N ตรง ๆ
+    ภาษาไทยไม่มีช่องว่างคั่นคำ การตัดดิบ ๆ จึงได้คำที่ขาดครึ่ง
+    """
+    text = " ".join(question.split())
+    if not text:
+        return None
+    if text.strip("?!.· ").casefold() in _GREETINGS:
+        return None
+    if len(text) <= TITLE_MAX_CHARS:
+        return text
+
+    try:
+        from pythainlp.tokenize import word_tokenize
+
+        pieces = word_tokenize(text, keep_whitespace=True)
+    except Exception:  # noqa: BLE001
+        # ตัวตัดคำใช้ไม่ได้ก็ยังต้องได้หัวข้อ แค่อาจตัดกลางคำ
+        return text[:TITLE_MAX_CHARS].rstrip() + "…"
+
+    out = ""
+    for piece in pieces:
+        if len(out) + len(piece) > TITLE_MAX_CHARS - 1:
+            break
+        out += piece
+    return (out.rstrip() or text[: TITLE_MAX_CHARS - 1].rstrip()) + "…"
 
 
 async def _record(
@@ -120,6 +181,11 @@ async def _record(
     usage: dict | None = None,
 ) -> uuid.UUID:
     session.add(ChatMessage(session_id=chat_session.id, role="user", content=question))
+
+    # ตั้งหัวข้อตอนมีคำถามแรกที่ใช้ได้จริง · คำทักทายล้วนให้ข้ามไปรอคำถามถัดไป
+    # เขียนครั้งเดียวแล้วไม่แตะอีก เพราะหัวข้อที่เปลี่ยนไปมาทำให้หาบทสนทนาเก่าไม่เจอ
+    if chat_session.title is None:
+        chat_session.title = derive_title(question)
 
     usage = usage or {}
     assistant = ChatMessage(

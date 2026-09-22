@@ -10,6 +10,8 @@
 อาจปล่อยได้ถึงสองเท่าของ limit ในช่วงสั้น ๆ ซึ่งรับได้ในบริบทนี้
 """
 import asyncio
+import hashlib
+import hmac
 import time
 from dataclasses import dataclass
 
@@ -30,6 +32,21 @@ def _redis() -> aioredis.Redis:
         client = aioredis.from_url(settings.redis_url, decode_responses=True)
         _clients[loop_id] = client
     return client
+
+
+def opaque_subject(value: str) -> str:
+    """ย่อค่าที่ระบุตัวตนให้เป็นคีย์ที่อ่านย้อนกลับไม่ได้
+
+    ใช้กับอีเมลตอนนับ login — ถ้าเอาอีเมลไปเป็นคีย์ของ Redis ตรง ๆ ใครที่อ่าน
+    Redis ได้ก็ได้รายชื่ออีเมลที่มีคนพยายามล็อกอินไปฟรี ๆ ทั้งที่ไม่จำเป็นเลย
+    เพราะเราต้องการแค่ "ค่าเดิมต้องได้คีย์เดิม" ไม่ได้ต้องการอ่านค่ากลับ
+
+    ผูกกับ APP_SECRET_KEY เพื่อไม่ให้ไล่ hash จากรายชื่ออีเมลที่เดาไว้มาเทียบได้
+    """
+    digest = hmac.new(
+        settings.app_secret_key.encode(), value.encode(), hashlib.sha256
+    ).hexdigest()
+    return digest[:32]
 
 
 @dataclass
@@ -62,15 +79,29 @@ async def hit(key: str, *, limit: int, window_seconds: int) -> Verdict:
 
 
 def client_ip(request: Request) -> str:
-    """IP ของผู้เรียก โดยเชื่อ X-Forwarded-For เฉพาะเมื่ออยู่หลัง proxy ของเราเอง
+    """IP ของผู้เรียก อ่านจาก X-Forwarded-For เท่าที่เชื่อได้จริง
 
-    Caddy ตั้ง header นี้ให้ ถ้าเปิด API ตรงออกอินเทอร์เน็ตโดยไม่มี proxy
-    ต้องปิดการเชื่อ header นี้ ไม่งั้นใครก็ปลอม IP เพื่อเลี่ยง rate limit ได้
+    X-Forwarded-For เป็นรายการเรียงจากซ้ายไปขวาตามลำดับที่ผ่าน proxy มา
+    proxy แต่ละตัวต่อท้ายด้วยที่อยู่ของผู้เรียกที่ *ตัวมันเอง* เห็น
+
+        <ค่าที่ผู้เรียกแต่งมาเอง>, <ที่ hop นอกสุดเห็น>, ..., <ที่ hop ในสุดเห็น>
+                ปลอมได้                 เชื่อได้ตามจำนวนชั้นที่เราคุม
+
+    จึงห้ามหยิบตัวซ้ายสุด — ตัวซ้ายสุดคือสิ่งที่ผู้เรียกพิมพ์ใส่ header มาเองได้
+    ต้องนับจากขวาเข้ามาเท่ากับจำนวน hop ที่เราคุม (`TRUSTED_PROXY_HOPS`)
+    จึงจะได้ที่อยู่ที่ hop นอกสุดของเราเห็น ซึ่งคือผู้เรียกจริงและปลอมไม่ได้
+
+    ถ้ารายการสั้นกว่าจำนวนชั้นที่ตั้งไว้ แปลว่าตั้งค่าไม่ตรงกับความจริง
+    กรณีนั้นถอยไปใช้ที่อยู่ของ peer ซึ่งอาจรวมทุกคนเป็นถังเดียว — จำกัดเกินจริง
+    แต่ปลอดภัย ดีกว่าหยิบค่าที่ผู้เรียกแต่งมาแล้วปล่อยให้เลี่ยงเพดานได้
     """
-    if settings.trust_proxy_headers:
+    hops = settings.trusted_proxy_hops
+    if hops > 0:
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            chain = [part.strip() for part in forwarded.split(",") if part.strip()]
+            if len(chain) >= hops:
+                return chain[-hops]
     return request.client.host if request.client else "unknown"
 
 

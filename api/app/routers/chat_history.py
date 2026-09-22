@@ -22,9 +22,6 @@ from app.schemas.base import Page
 
 router = APIRouter(prefix="/api/chat", tags=["chat-history"])
 
-# ตัดหัวข้อให้พอเห็นว่าคุยเรื่องอะไร ยาวกว่านี้ก็ล้นแถบข้างอยู่ดี
-TITLE_MAX_CHARS = 80
-
 
 class SessionSummary(BaseModel):
     id: uuid.UUID
@@ -112,33 +109,20 @@ async def list_sessions(
     if not rows:
         return Page[SessionSummary](items=[], total=total, limit=limit, offset=offset)
 
-    ids = [row[0].id for row in rows]
-
-    # หัวข้อ = คำถามแรกของผู้ใช้ใน session นั้น · DISTINCT ON เป็นของ Postgres
-    # ได้แถวแรกต่อ session ในคิวรี่เดียว ไม่ต้องยิงทีละอัน
-    first_q = (
-        await session.execute(
-            select(ChatMessage.session_id, ChatMessage.content)
-            .where(ChatMessage.session_id.in_(ids), ChatMessage.role == "user")
-            .order_by(ChatMessage.session_id, ChatMessage.created_at)
-            .distinct(ChatMessage.session_id)
+    # หัวข้อถูกคำนวณและเก็บไว้ตอนบันทึกคำถามแรกแล้ว (ดู orchestrator.derive_title)
+    # จึงอ่านจากแถวได้ตรง ๆ ไม่ต้องทำ DISTINCT ON ทุกครั้งที่เปิดหน้า
+    #
+    # ยังต้องเผื่อค่าว่าง: บทสนทนาที่มีแต่คำทักทายจะยังไม่มีหัวข้อโดยตั้งใจ
+    out = [
+        SessionSummary(
+            id=chat_session.id,
+            title=(chat_session.title or "").strip() or "บทสนทนาไม่มีหัวข้อ",
+            message_count=count,
+            last_message_at=last_at.isoformat(),
+            created_at=chat_session.created_at.isoformat(),
         )
-    ).all()
-    titles = {sid: content for sid, content in first_q}
-
-    out = []
-    for chat_session, count, last_at in rows:
-        raw = (titles.get(chat_session.id) or "").strip()
-        title = raw[:TITLE_MAX_CHARS] + "…" if len(raw) > TITLE_MAX_CHARS else raw
-        out.append(
-            SessionSummary(
-                id=chat_session.id,
-                title=title or "บทสนทนาไม่มีหัวข้อ",
-                message_count=count,
-                last_message_at=last_at.isoformat(),
-                created_at=chat_session.created_at.isoformat(),
-            )
-        )
+        for chat_session, count, last_at in rows
+    ]
     return Page[SessionSummary](items=out, total=total, limit=limit, offset=offset)
 
 

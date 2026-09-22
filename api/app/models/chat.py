@@ -35,6 +35,9 @@ class ChatSession(Base):
     )
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
     client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # หัวข้อที่คำนวณครั้งเดียวตอนบันทึกคำถามแรก — ดู orchestrator.derive_title()
+    # NULL ได้เมื่อบทสนทนายังไม่มีข้อความ (สร้าง session แล้วโมเดลล้มก่อนตอบ)
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.clock_timestamp(), nullable=False, index=True
     )

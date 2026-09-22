@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import uuid
 from typing import Any
 
 import httpx
@@ -10,10 +12,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_session
+from app.core.deps import get_optional_user
 from app.llm import ollama_admin
 from app.llm.client import ChatClient
+from app.models.user import User
 
 router = APIRouter(tags=["health"])
+log = logging.getLogger("app.health")
+
+
+def _opaque(name: str, exc: Exception) -> str:
+    """แปลง exception เป็นรหัสอ้างอิง แทนการส่งข้อความดิบออกไป
+
+    ข้อความ exception ของ asyncpg/httpx มีทั้งชื่อโฮสต์ พอร์ต และพาธไฟล์ในเครื่อง
+    endpoint นี้ต้องเรียกได้โดยไม่ต้องล็อกอิน (monitor ภายนอกต้องใช้) การส่งข้อความ
+    ดิบออกไปจึงเท่ากับแจกผังระบบให้คนนอก
+
+    ใช้วิธีเดียวกับ /api/chat — log ตัวเต็มไว้ข้างในพร้อมรหัส แล้วส่งออกแค่รหัสนั้น
+    """
+    reference = uuid.uuid4().hex[:8]
+    log.warning("health check ล้มเหลว name=%s ref=%s", name, reference, exc_info=exc)
+    return f"ตรวจไม่ผ่าน (รหัสอ้างอิง {reference})"
 
 
 @router.get("/health")
@@ -33,7 +52,7 @@ async def _check_postgres(session: AsyncSession) -> dict[str, Any]:
             return {"ok": False, "detail": "ยังไม่ได้เปิด extension vector — รัน alembic upgrade head"}
         return {"ok": True, "pgvector": version}
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
+        return {"ok": False, "detail": _opaque("postgres", exc)}
 
 
 async def _check_redis() -> dict[str, Any]:
@@ -42,7 +61,7 @@ async def _check_redis() -> dict[str, Any]:
         await client.ping()
         return {"ok": True}
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
+        return {"ok": False, "detail": _opaque("redis", exc)}
     finally:
         await client.aclose()
 
@@ -58,7 +77,7 @@ async def _probe_provider(name: str, client: ChatClient) -> dict[str, Any]:
     try:
         models = await client.list_models()
     except httpx.HTTPError as exc:
-        return {"name": name, "ok": False, "model": client.model, "detail": f"{type(exc).__name__}: {exc}"}
+        return {"name": name, "ok": False, "model": client.model, "detail": _opaque(f"llm:{name}", exc)}
 
     ok = _has_model(client.model, models)
     return {
@@ -101,7 +120,7 @@ async def _check_ocr() -> dict[str, Any]:
             model=settings.typhoon_ocr_model,
         ).list_models()
     except httpx.HTTPError as exc:
-        return {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
+        return {"ok": False, "detail": _opaque("ocr", exc)}
     wanted = settings.typhoon_ocr_model
     ok = _has_model(wanted, models)
     return {
@@ -124,7 +143,7 @@ async def _check_embeddings() -> dict[str, Any]:
             if not ok:
                 detail = f"{base}/health ตอบ {resp.status_code}"
     except httpx.HTTPError as exc:
-        detail = f"{type(exc).__name__}: {exc}"
+        detail = _opaque("embeddings", exc)
 
     if not ok and detail is None:
         detail = "TEI ยังไม่พร้อม (ครั้งแรกต้องโหลดโมเดลก่อน ใช้เวลาหลายนาที)"
@@ -149,9 +168,26 @@ async def _guarded(name: str, coro) -> dict[str, Any]:
         return {"ok": False, "detail": f"{name} ไม่ตอบใน {DEEP_CHECK_BUDGET_SECONDS} วินาที"}
 
 
+def _summarised(checks: dict[str, Any]) -> dict[str, Any]:
+    """เหลือแค่ผ่าน/ไม่ผ่าน สำหรับผู้เรียกที่ไม่ใช่ admin
+
+    รายละเอียดที่ตัดออกคือของที่มีประโยชน์กับคนที่จะลองโจมตีล้วน ๆ —
+    รุ่น pgvector, ชื่อโมเดลที่ใช้, รายชื่อ provider, ว่าตัวไหนกำลังทำงานอยู่
+    และสถานะ GPU · ส่วนที่เหลือไว้พอให้ monitor ภายนอกดูเขียว/แดงได้ตามเดิม
+    """
+    return {name: {"ok": bool(check["ok"])} for name, check in checks.items()}
+
+
 @router.get("/health/deep")
-async def health_deep(session: AsyncSession = Depends(get_session)) -> JSONResponse:
-    """readiness — เช็คทุก dependency ใช้ยืนยันเฟส 0"""
+async def health_deep(
+    session: AsyncSession = Depends(get_session),
+    viewer: User | None = Depends(get_optional_user),
+) -> JSONResponse:
+    """readiness — เช็คทุก dependency ใช้ยืนยันเฟส 0
+
+    ตอบได้โดยไม่ต้องล็อกอิน เพราะ monitor ภายนอกและ `check.ps1` ต้องเรียกได้
+    แต่ตอบ *ไม่เท่ากัน*: รายละเอียดทั้งหมดเห็นเฉพาะ admin
+    """
     # เช็ค DB ให้จบก่อน ไม่เอาไปรวมใน gather กับ network check ที่ช้า
     # ถ้า client ตัดการเชื่อมต่อระหว่างรอ network session จะถูกปิดขณะ query ยังทำงาน
     # แล้วได้ IllegalStateChangeError ซึ่งทำให้ health check เองกลายเป็น 500
@@ -173,6 +209,16 @@ async def health_deep(session: AsyncSession = Depends(get_session)) -> JSONRespo
         "embeddings": embeddings,
     }
     all_ok = all(c["ok"] for c in checks.values())
+    status_code = 200 if all_ok else 503
+
+    if viewer is None or not viewer.is_admin:
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "status": "ok" if all_ok else "degraded",
+                "checks": _summarised(checks),
+            },
+        )
 
     gpu: dict[str, Any] = {"loaded_models": ollama_admin.summarize(gpu_models)}
     # ต้องเป็น "100% GPU" — ถ้าไม่ใช่ OCR จะช้ากว่าปกติหลายเท่าแบบไม่มี error
@@ -186,4 +232,4 @@ async def health_deep(session: AsyncSession = Depends(get_session)) -> JSONRespo
         "checks": checks,
         "gpu": gpu,
     }
-    return JSONResponse(status_code=200 if all_ok else 503, content=body)
+    return JSONResponse(status_code=status_code, content=body)

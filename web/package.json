@@ -7,10 +7,13 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
     "lint": "eslint src",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
+    "contrast": "node scripts/check-contrast.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run contrast && npm run test"
   },
   "dependencies": {
     "next": "16.3.4",
@@ -23,6 +26,7 @@
     "@types/react-dom": "^19.2.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.5",
+    "prettier": "^3.9.8",
     "typescript": "^5.7.3",
     "vitest": "^3.2.4"
   }

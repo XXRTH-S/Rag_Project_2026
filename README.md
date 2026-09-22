@@ -117,7 +117,10 @@ flowchart LR
 
 - กรองสิทธิ์ที่ระดับ SQL ทุกจุด และตอบ 404 ไม่ใช่ 403 กันการไล่เดาว่ามีของอยู่จริง
 - อ่านสิทธิ์จาก database ทุก request ไม่ใช่จาก JWT — ปิดบัญชีแล้วมีผลทันที
-- rate limit ที่ login (ต่อ IP), chat/upload/playground (ต่อผู้ใช้)
+- rate limit ที่ login สองชั้น (ต่อ IP เข้มงวด + ต่ออีเมลหลวมกว่า กันคนหมุน IP), chat/upload/playground (ต่อผู้ใช้)
+- หา IP จริงจาก `X-Forwarded-For` โดยนับจากขวาตาม `TRUSTED_PROXY_HOPS` ไม่ใช่หยิบตัวซ้ายสุดที่ผู้เรียกแต่งเองได้
+- บทสนทนาเป็นของเจ้าของเท่านั้น — ส่ง `session_id` ของคนอื่นมาได้ 404 ไม่ใช่การต่อบทสนทนา
+- `/health/deep` แจกรายละเอียด (รุ่น ชื่อโมเดล สถานะ GPU) เฉพาะ admin คนอื่นเห็นแค่เขียว/แดง
 - เวลาตอบของ login เท่ากันทั้งกรณีมีและไม่มีบัญชี กันการเดาอีเมลจากเวลา
 - จำกัดขนาดไฟล์ระหว่างอ่าน ไม่ดึงทั้งไฟล์เข้าหน่วยความจำก่อน
 - ไม่ส่งข้อความ exception ดิบให้ผู้ใช้ — ส่งรหัสอ้างอิงแล้วเก็บรายละเอียดไว้ใน log
@@ -149,7 +152,7 @@ flowchart LR
 | retrieval (hybrid) | hit@1 **100%** · MRR **1.000** ทั้งชุดคำถาม HR และชุดคำถามเขียนโปรแกรม |
 | การปฏิเสธเมื่อไม่มีคำตอบ | ชั้น retrieval ปล่อยผ่านบ้าง แต่ชั้น LLM ปฏิเสธถูก **9/9** ในการวัดปลายทาง |
 | รองรับได้ | ราว **5–10 users** ที่ใช้โควตาเต็มทุกวัน |
-| เทส | API **258** · web **10** · smoke ผ่านทุกหมวด |
+| เทส | API **299** · web **17** · smoke ผ่านทุกหมวด |
 
 วัดซ้ำเองได้:
 
@@ -255,11 +258,91 @@ dev server จะไม่รีคอมไพล์เอง ต้อง `.\d
 
 ---
 
+## ขึ้น Vercel
+
+API ชุดนี้ deploy เป็น serverless function บน Vercel ได้ **บางส่วน** — ตัวแอปบูตได้
+โดยไม่ต้องมี system library เลย (`magic`, `pypdf`, `PIL`, `celery`, `uvicorn`, `alembic`
+ถูก import แบบ lazy ทั้งหมด · มีเทสบังคับไว้ที่ `tests/test_serverless_bundle.py`)
+
+### ทำงานได้
+
+เข้าสู่ระบบ · ถาม-ตอบแบบสตรีม · ค้นคืน (hybrid) · ประวัติบทสนทนา · โควตา ·
+analytics · จัดการผู้ใช้ · playground · `/health`
+
+### ทำงานไม่ได้ และแก้ไม่ได้ด้วยการตั้งค่า
+
+**การนำเข้าเอกสาร** — อัปโหลด, bulk, reprocess · เพราะต้องมีครบสามอย่างที่ serverless ไม่มี
+
+| ต้องการ | ทำไม serverless ให้ไม่ได้ |
+|---|---|
+| Celery worker | OCR กินเวลาเป็นนาทีต่อเอกสาร ทำใน request ไม่ได้ |
+| poppler + libmagic | เป็น system binary ไม่ใช่แพ็กเกจ Python |
+| GPU | typhoon-ocr ต้องใช้ · บน CPU ช้ากว่า 5–10 เท่า |
+| ดิสก์ที่อยู่ถาวร | ไฟล์ต้นฉบับต้องอ่านซ้ำได้ตอน reprocess |
+
+ตั้ง `INGESTION_ENABLED=false` แล้วสามเส้นทางนี้จะตอบ **503 พร้อมบอกว่าให้ไปทำที่ไหน**
+แทนที่จะล้มด้วย `ImportError` หรือรับไฟล์ไว้แล้วมันหายตอน container ถูกรีไซเคิล
+
+**วิธีใช้งานจริงคือแบ่งหน้าที่** — นำเข้าเอกสารบนเครื่องที่มี Docker + GPU
+ส่วน Vercel ต่อเข้าฐานข้อมูลเดียวกันเพื่ออ่านและตอบคำถาม
+
+### ต้องเตรียมบริการภายนอกก่อน
+
+Vercel ไม่มี Postgres, Redis, GPU หรือ embedding server ให้ ต้องหามาต่อเอง
+
+| ต้องการ | ใช้อะไรได้ | หมายเหตุ |
+|---|---|---|
+| PostgreSQL + **pgvector** | Neon, Supabase | ต้องรองรับ pgvector · รัน `alembic upgrade head` จากเครื่องที่มี Docker |
+| Redis | Upstash | ใช้กับ rate limit |
+| LLM | OpenRouter หรือเจ้าใดก็ได้ที่เป็น OpenAI-compatible | โค้ดรองรับอยู่แล้ว แค่ตั้ง `LLM_BASE_URL` + `LLM_API_KEY` |
+| Embedding | บริการที่เสิร์ฟ **bge-m3** ได้ | ⚠️ ต้องเป็นโมเดลเดิม 1024 มิติ ถ้าเปลี่ยนโมเดล vector ที่มีอยู่ในฐานข้อมูลจะใช้เทียบกันไม่ได้ ต้อง reprocess ทั้งคลัง |
+
+### ค่าที่ต้องตั้งบน Vercel
+
+```
+DATABASE_URL=postgresql+asyncpg://...
+REDIS_URL=rediss://...
+APP_SECRET_KEY=<ค่าเดียวกับที่ใช้อยู่ ไม่งั้น cookie เดิมใช้ไม่ได้>
+LLM_BASE_URL=...        LLM_API_KEY=...        LLM_MODEL=...
+EMBEDDING_BASE_URL=...  EMBEDDING_API_KEY=...
+INGESTION_ENABLED=false
+API_DOCS_ENABLED=false
+COOKIE_SECURE=true
+TRUSTED_PROXY_HOPS=1
+CORS_ALLOWED_ORIGINS=https://<โดเมนของ frontend>
+```
+
+### deploy
+
+โปรเจกต์ Vercel ของ API ใช้ **รากของ repo** เป็น root directory (เพราะ `@vercel/python`
+มองหา entrypoint ใน `api/`) ส่วนหน้าเว็บเป็นคนละโปรเจกต์ที่ root เป็น `web/`
+
+```powershell
+npx vercel --prod          # จากรากของ repo
+```
+
+แล้วชี้หน้าเว็บมาที่นี่ด้วยการตั้ง `BACKEND_HTTPS_ORIGIN` ของโปรเจกต์ frontend
+เป็นโดเมนของ API ที่เพิ่ง deploy — **ไม่ต้องใช้ ngrok อีก** สำหรับการสาธิตการถาม-ตอบ
+(ยังต้องใช้เครื่องที่มี Docker เมื่อจะนำเข้าเอกสารใหม่)
+
+ไฟล์ที่เกี่ยวข้อง: [`vercel.json`](vercel.json) · [`.vercelignore`](.vercelignore) ·
+[`api/index.py`](api/index.py) · [`api/requirements.txt`](api/requirements.txt)
+
+> `api/requirements.txt` ใช้เฉพาะบน Vercel — ที่อื่นยังใช้ `pyproject.toml`
+> ตัดแพ็กเกจฝั่ง ingestion ออกเพื่อให้ bundle อยู่ใต้เพดาน 250 MB
+> (`pythainlp` 65 MB ยังต้องมี เพราะ keyword leg ของ hybrid ใช้ตัดคำไทย
+> ถอดออกแล้ว hit@1 ตกจาก 100% เหลือ 88%)
+
+---
+
 ## สิ่งที่ยังต้องทำ
+
+> ผลตรวจฉบับเต็มเมื่อ 21–22 ก.ย. 2026 พร้อมสิ่งที่แก้ไปแล้วอยู่ใน **[AUDIT.md](AUDIT.md)**
 
 ### ควรทำก่อนเปิดใช้จริง
 
-- [ ] ตั้ง `API_DOCS_ENABLED=false` และ `COOKIE_SECURE=true` เมื่อขึ้น HTTPS
+- [x] ~~ตั้ง `API_DOCS_ENABLED=false`~~ — default เป็น false แล้ว เปิดเฉพาะตอน dev ผ่าน `docker-compose.override.yml`
+- [x] ~~`COOKIE_SECURE=true` เมื่อขึ้น HTTPS~~ — `docker-compose.https.yml` ตั้งให้แล้ว
 - [ ] เปลี่ยน `APP_SECRET_KEY` จากค่า default (ระบบยังไม่บังคับให้เปลี่ยน)
 - [ ] วัดคุณภาพ OCR ด้วยไฟล์สแกนจริง แล้วปรับ `OCR_SECONDS_PER_PAGE` ตามที่วัดได้
 - [ ] ทดสอบ CI บน GitHub จริง — เขียน workflow ไว้แล้วแต่ยังไม่เคยรัน
@@ -268,16 +351,19 @@ dev server จะไม่รีคอมไพล์เอง ต้อง `.\d
 
 - [ ] `docker-compose.gpu.yml` สำหรับ tier PROD (vLLM + Qwen3.8-27B) — โค้ดรองรับแล้ว เหลือแค่ไฟล์ compose
 - [ ] reranker (`bge-reranker-v2-m3`) — hybrid ยก hit@1 เป็น 100% แล้ว ยังไม่มีหลักฐานว่าจำเป็น
-- [ ] ปุ่ม reprocess / bulk upload ในหน้าเว็บ — API มีแล้ว แต่ยังไม่มีปุ่ม
-- [ ] ค้นหาและกรองในหน้ารายการเอกสาร
+- [x] ~~ปุ่ม reprocess / bulk upload ในหน้าเว็บ~~ — อยู่ในหน้าเอกสารแล้ว (เห็นเฉพาะ admin)
+- [x] ~~ค้นหาและกรองในหน้ารายการเอกสาร~~
 - [ ] เลือก collection ตอนถาม — ระบบรองรับที่ API แล้วแต่ UI ยังไม่มีตัวเลือก
+- [ ] widget ใช้กับ frontend ที่ host แยกไม่ได้ — `widget.js` เรียก `fetch` ตรง ไม่ผ่าน `apiFetch` และ `/api/widget/config` คืน `api_base` เป็น localhost
 
 ### หนี้ทางเทคนิค
 
 - [ ] chunker ตัดตามหัวข้อ markdown แต่ typhoon-ocr คืนข้อความธรรมดา — หน้ายาวหลายเรื่องจะได้ chunk ที่ปนกัน
-- [ ] เทสฝั่ง web มีแค่ตรรกะล้วน ยังไม่มีเทสที่ render component
+- [ ] เทสฝั่ง web มีแค่ตรรกะล้วน ยังไม่มีเทสที่ render component — ใช้ภาพหน้าจอใน `artifacts/` แทนไปก่อน
 - [ ] งาน ingestion ที่ "เริ่มแล้วค้างกลางทาง" ยังต้องแก้เอง — ต้องมี heartbeat ถึงจะแยกจากงานที่กำลังเดินอยู่ได้
 - [ ] `looks_like_refusal()` จับถ้อยคำภาษาไทย ถ้าตั้ง prompt config ให้ปฏิเสธด้วยคำอื่นทั้งหมด การนับช่องว่างของคลังจะพลาด
+- [ ] ชุดเทสมี flake ราว 1 ใน 282 ตัวต่อรอบ — `StaleDataError` ในเทสที่ยิง Celery/Redis จริง
+- [ ] `chat_sessions.client_ip` บันทึก IP ของ proxy ไม่ใช่ของผู้ใช้ — ไร้ประโยชน์ตามที่เป็นอยู่ และถ้าทำให้ใช้ได้จริงต้องคิดเรื่อง PDPA ก่อน
 
 ---
 
@@ -287,17 +373,23 @@ dev server จะไม่รีคอมไพล์เอง ต้อง `.\d
 ├── README.md                   ไฟล์นี้
 ├── PLAN.md                     แผนงานฉบับเต็ม สถาปัตยกรรม และการตัดสินใจ
 ├── RESUME.md                   บันทึกสถานะ ตัวเลขที่วัดได้ และบั๊กที่เจอ
+├── AUDIT.md                    ผลตรวจ 21–22 ก.ย. 2026 และสิ่งที่แก้ไปแล้ว
+├── DEMO.md                     บัญชีสาธิตและการเปิด tunnel
 ├── docker-compose.yml          app stack
 ├── docker-compose.local.yml    Ollama + GPU (tier LOCAL)
 ├── docker-compose.override.yml hot reload ตอน dev
+├── docker-compose.https.yml    tunnel สำหรับสาธิต (ngrok -> Caddy)
+├── vercel.json / .vercelignore  deploy API ขึ้น Vercel (ดูหัวข้อ "ขึ้น Vercel")
 ├── dc.ps1 / check.ps1 / test.ps1 / backup.ps1
 ├── caddy/Caddyfile
 ├── corpus/programming/         เอกสารตัวอย่างสำหรับเติมคลัง
 ├── api/
-│   ├── alembic/versions/       migration 0001–0004
+│   ├── index.py                entrypoint ของ Vercel (ส่งต่อ app.main เฉย ๆ)
+│   ├── requirements.txt        deps เฉพาะตอนขึ้น Vercel (ตัดฝั่ง ingestion ออก)
+│   ├── alembic/versions/       migration 0001–0005
 │   ├── evalsets/               ชุดคำถามวัดคุณภาพ retrieval
-│   ├── scripts/                eval.py · smoke.py · spike.py
-│   ├── tests/                  32 ไฟล์
+│   ├── scripts/                eval.py · smoke.py · spike.py · purge_chats.py
+│   ├── tests/                  37 ไฟล์
 │   └── app/
 │       ├── core/               config, db, security, deps, ratelimit
 │       ├── models/             SQLAlchemy
@@ -307,8 +399,9 @@ dev server จะไม่รีคอมไพล์เอง ต้อง `.\d
 │       ├── retrieval/          embeddings, search, keywords
 │       └── ingestion/          detect, parsers, ocr, chunk, clean, tasks
 └── web/
+    ├── scripts/check-contrast.mjs  วัด contrast ของ token ทั้งสองโหมด
     ├── src/app/                8 หน้า
-    ├── src/components/         Nav, Shell
+    ├── src/components/         Nav, Shell, Icon, PageIntro, ThemeToggle
     ├── src/lib/                api, useAuth, citations
     └── public/widget.js        widget ฝังเว็บอื่น
 ```

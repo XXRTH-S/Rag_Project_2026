@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import ratelimit
 from app.core.config import settings
 from app.core.db import get_session
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, require_ingestion
 from app.ingestion import queue as ingest_queue
 from app.ingestion.detect import plan_document
 from app.models.document import Document, IngestionJob
@@ -106,7 +106,12 @@ async def save_upload_within_limit(
     return head, total
 
 
-@router.post("", response_model=UploadAccepted, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "",
+    response_model=UploadAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_ingestion)],
+)
 async def upload_document(
     request: Request,
     file: UploadFile = File(...),

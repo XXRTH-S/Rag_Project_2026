@@ -28,3 +28,10 @@ backups/
 
 # build artifact ของ tsc — เปลี่ยนทุกครั้งที่ typecheck ไม่ควรอยู่ในประวัติ
 *.tsbuildinfo
+
+# Local deployment metadata and private browser evidence
+.vercel/
+output/playwright/
+artifacts/
+# log ที่ playwright CLI ทิ้งไว้ตอน debug หน้าเว็บ — มี URL และ state ของ session
+.playwright-cli/

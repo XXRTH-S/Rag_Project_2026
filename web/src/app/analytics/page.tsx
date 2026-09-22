@@ -80,6 +80,7 @@ function AnalyticsInner() {
         api<Ingestion>(`/api/admin/analytics/ingestion?days=${days}`),
         api<QuotaUsage>(`/api/admin/quota/usage?days=${days}`),
       ]);
+      setError(null);
       setOverview(o);
       setUnanswered(u);
       setDocs(d);
@@ -99,11 +100,9 @@ function AnalyticsInner() {
   return (
     <>
       <div className="row">
-        <div>
-          <h1>Analytics</h1>
-          <p className="sub">ตัวเลขที่ใช้ตัดสินว่าคลังความรู้ขาดอะไร และเมื่อไหร่ต้องขยายเครื่อง</p>
-        </div>
+        <h2 style={{ margin: 0 }}>สรุปตามช่วงเวลา</h2>
         <select
+          aria-label="ช่วงเวลาที่แสดง"
           style={{ width: "auto" }}
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
@@ -114,7 +113,11 @@ function AnalyticsInner() {
         </select>
       </div>
 
-      {error && <div className="alert" role="alert">{error}</div>}
+      {error && (
+        <div className="alert" role="alert">
+          {error}
+        </div>
+      )}
 
       {overview && (
         <>
@@ -160,7 +163,7 @@ function AnalyticsInner() {
 
       {ingestion && (
         <>
-          <h2>Ingestion</h2>
+          <h2>การประมวลผลเอกสาร</h2>
           <div className="grid">
             <Stat
               label="งานทั้งหมด"
@@ -171,7 +174,7 @@ function AnalyticsInner() {
             <Stat
               label="วินาที/หน้า (จริง)"
               value={ingestion.seconds_per_page?.toFixed(1) ?? "—"}
-              hint="เอาไปแทน OCR_SECONDS_PER_PAGE ใน .env เพื่อให้ ETA แม่นขึ้น"
+              hint="เฉลี่ยจากงานที่ประมวลผลในช่วงเวลานี้"
             />
             <Stat
               label="รอคิว p95"
@@ -180,7 +183,7 @@ function AnalyticsInner() {
                   ? `${Math.round(ingestion.queue_wait_p95_seconds / 60)} นาที`
                   : "—"
               }
-              hint="เกิน 8 ชม. ติดกัน 3 วัน = ถึงเวลาขยายเครื่อง"
+              hint="ระยะเวลารอคิวของงานส่วนใหญ่"
             />
           </div>
         </>

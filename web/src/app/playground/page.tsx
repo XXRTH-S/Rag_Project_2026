@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Icon } from "@/components/Icon";
 import { Shell } from "@/components/Shell";
 import { api, type PlaygroundResult, type PromptConfig } from "@/lib/api";
 
@@ -25,7 +26,9 @@ function PlaygroundInner() {
       api<{ system_prompt: string }>("/api/admin/prompt-configs/default"),
     ]);
     setConfigs(list);
-    setSystemPrompt((prev) => prev || list.find((c) => c.is_active)?.system_prompt || fallback.system_prompt);
+    setSystemPrompt(
+      (prev) => prev || list.find((c) => c.is_active)?.system_prompt || fallback.system_prompt,
+    );
   }, []);
 
   useEffect(() => {
@@ -88,7 +91,9 @@ function PlaygroundInner() {
   }
 
   async function removeConfig(config: PromptConfig) {
-    const extra = config.is_active ? "\n\nconfig นี้กำลังใช้งานอยู่ ลบแล้วระบบจะกลับไปใช้ prompt เริ่มต้น" : "";
+    const extra = config.is_active
+      ? "\n\nconfig นี้กำลังใช้งานอยู่ ลบแล้วระบบจะกลับไปใช้ prompt เริ่มต้น"
+      : "";
     if (!confirm(`ลบ "${config.name}"?${extra}`)) return;
     await api(`/api/admin/prompt-configs/${config.id}`, { method: "DELETE" });
     await loadConfigs();
@@ -96,13 +101,35 @@ function PlaygroundInner() {
 
   return (
     <>
-      <h1>Playground</h1>
-      <p className="sub">
-        คืน chunk ดิบพร้อมคะแนน เพื่อแยกให้ออกว่าคำตอบผิดเพราะ retrieval หาไม่เจอ หรือเจอแล้วแต่โมเดลตอบเพี้ยน
-      </p>
+      {error && (
+        <div className="alert" role="alert">
+          {error}
+        </div>
+      )}
 
-      {error && <div className="alert" role="alert">{error}</div>}
-
+      <div className="guide-grid">
+        <div className="guide-item">
+          <Icon name="search" />
+          <div>
+            <strong>ตรวจการค้นหา</strong>
+            <p>ดูว่าเอกสารส่วนไหนตรงกับคำถาม</p>
+          </div>
+        </div>
+        <div className="guide-item">
+          <Icon name="playground" />
+          <div>
+            <strong>ทดลองคำสั่ง</strong>
+            <p>ปรับน้ำเสียงและรูปแบบของคำตอบ</p>
+          </div>
+        </div>
+        <div className="guide-item">
+          <Icon name="check" />
+          <div>
+            <strong>บันทึกเมื่อพร้อม</strong>
+            <p>เปิดใช้ชุดคำสั่งที่เหมาะกับงาน</p>
+          </div>
+        </div>
+      </div>
       <form className="card" onSubmit={run}>
         <div className="field">
           <label htmlFor="q">คำถาม</label>
@@ -111,7 +138,7 @@ function PlaygroundInner() {
 
         <div className="grid">
           <div className="field">
-            <label htmlFor="topk">top_k</label>
+            <label htmlFor="topk">จำนวนส่วนเอกสาร (top_k)</label>
             <input
               id="topk"
               type="number"
@@ -122,7 +149,7 @@ function PlaygroundInner() {
             />
           </div>
           <div className="field">
-            <label htmlFor="min">min_score</label>
+            <label htmlFor="min">คะแนนขั้นต่ำ (min_score)</label>
             <input
               id="min"
               type="number"
@@ -134,7 +161,7 @@ function PlaygroundInner() {
             />
           </div>
           <div className="field">
-            <label htmlFor="temp">temperature</label>
+            <label htmlFor="temp">ความหลากหลาย (temperature)</label>
             <input
               id="temp"
               type="number"
@@ -148,8 +175,12 @@ function PlaygroundInner() {
         </div>
 
         <div className="field">
-          <label htmlFor="sp">system prompt</label>
-          <textarea id="sp" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
+          <label htmlFor="sp">คำสั่งของผู้ช่วย (system prompt)</label>
+          <textarea
+            id="sp"
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+          />
         </div>
 
         <div className="btn-row">
@@ -163,11 +194,18 @@ function PlaygroundInner() {
               checked={!callLlm}
               onChange={(e) => setCallLlm(!e.target.checked)}
             />
-            ดูเฉพาะ retrieval (ไม่เรียก LLM — เร็วกว่ามากบนการ์ดนี้)
+            ค้นเอกสารอย่างเดียว ไม่สร้างคำตอบ
           </label>
         </div>
       </form>
 
+      {!result && (
+        <div className="empty-state">
+          <Icon name="playground" size={32} />
+          <h3>ดูเบื้องหลังของแต่ละคำตอบ</h3>
+          <p>พิมพ์คำถามแล้วกดทดสอบ เพื่อดูคำตอบและส่วนเอกสารที่ระบบเลือกมาอ้างอิง</p>
+        </div>
+      )}
       {result && (
         <>
           {result.answer !== null && (
@@ -186,8 +224,8 @@ function PlaygroundInner() {
           <h2>chunk ที่ค้นเจอ ({result.hits.length})</h2>
           {result.hits.length === 0 && (
             <div className="alert info">
-              ไม่มี chunk ไหนผ่านเกณฑ์ min_score — ระบบจะตอบว่าไม่พบข้อมูลโดยไม่เรียก LLM
-              ลองลด min_score เพื่อดูว่าใกล้เคียงแค่ไหน
+              ไม่มี chunk ไหนผ่านเกณฑ์ min_score — ระบบจะตอบว่าไม่พบข้อมูลโดยไม่เรียก LLM ลองลด
+              min_score เพื่อดูว่าใกล้เคียงแค่ไหน
             </div>
           )}
           {result.hits.map((hit) => (
@@ -206,7 +244,7 @@ function PlaygroundInner() {
         </>
       )}
 
-      <h2>Prompt config</h2>
+      <h2>ชุดคำสั่งที่บันทึกไว้</h2>
       <div className="card">
         <div className="field">
           <label htmlFor="cfgname">บันทึกค่าปัจจุบันเป็น config ใหม่</label>

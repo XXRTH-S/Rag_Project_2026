@@ -133,6 +133,20 @@ services:
       - caddy-config:/config
     restart: unless-stopped
 
+  demo-retention:
+    image: rag-workshop-api:latest
+    profiles: [demo]
+    env_file: [.env]
+    environment:
+      UPLOAD_DIR: /data/uploads
+    command: ["python", "scripts/retention_demo.py", "--apply", "--loop"]
+    volumes:
+      - ./api:/app:ro
+      - uploads:/data/uploads
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:

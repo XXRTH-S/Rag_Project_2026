@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Icon } from "@/components/Icon";
 import { Shell } from "@/components/Shell";
-import { API_BASE, type Page } from "@/lib/api";
+import { API_BASE, apiFetch, formatDate, type Page } from "@/lib/api";
 import { citationLabel, stripCitationMarkers, type Citation } from "@/lib/citations";
 type Message = {
   role: "user" | "assistant";
@@ -67,9 +68,11 @@ async function* readSse(response: Response): AsyncGenerator<{ event: string; dat
   }
 }
 
-
-
 function ChatInner({ isAdmin }: { isAdmin: boolean }) {
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const chatScroll = useRef<HTMLDivElement>(null);
+  const composerInput = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -86,7 +89,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
 
   const refreshSessions = useCallback(async () => {
     try {
-      const r = await fetch(`${API_BASE}/api/chat/sessions?limit=${sessionLimit}`, {
+      const r = await apiFetch(`${API_BASE}/api/chat/sessions?limit=${sessionLimit}`, {
         credentials: "include",
       });
       if (r.ok) {
@@ -101,8 +104,9 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
 
   const openSession = useCallback(async (id: string) => {
     setError(null);
+    setOpening(true);
     try {
-      const r = await fetch(`${API_BASE}/api/chat/sessions/${id}`, { credentials: "include" });
+      const r = await apiFetch(`${API_BASE}/api/chat/sessions/${id}`, { credentials: "include" });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const body: { messages: HistoryMessage[] } = await r.json();
       setMessages(
@@ -113,13 +117,16 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
           messageId: m.role === "assistant" ? m.id : undefined,
           answeredFromContext: m.answered_from_context,
           feedback: m.feedback === 1 || m.feedback === -1 ? m.feedback : undefined,
-        }))
+        })),
       );
+      setHistoryOpen(false);
       sessionId.current = id;
       setActiveId(id);
       localStorage.setItem(LAST_SESSION_KEY, id);
     } catch (err) {
       setError(err instanceof Error ? `เปิดบทสนทนาไม่ได้: ${err.message}` : "เปิดบทสนทนาไม่ได้");
+    } finally {
+      setOpening(false);
     }
   }, []);
 
@@ -128,7 +135,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${API_BASE}/api/chat/sessions`, { credentials: "include" });
+        const r = await apiFetch(`${API_BASE}/api/chat/sessions`, { credentials: "include" });
         if (!r.ok) return;
         const page: Page<SessionSummary> = await r.json();
         setSessions(page.items);
@@ -144,7 +151,8 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
   }, [openSession]);
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth" });
+    const el = chatScroll.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   // บนการ์ดนี้กว่า token แรกจะออกมาใช้เวลา 15–37 วินาที ถ้าไม่มีอะไรขยับเลย
@@ -158,6 +166,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
   }, [busy]);
 
   function startNew() {
+    setHistoryOpen(false);
     sessionId.current = null;
     setActiveId(null);
     setMessages([]);
@@ -167,7 +176,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
 
   async function removeSession(id: string) {
     if (!confirm("ลบบทสนทนานี้ทิ้ง? กู้คืนไม่ได้")) return;
-    const r = await fetch(`${API_BASE}/api/chat/sessions/${id}`, {
+    const r = await apiFetch(`${API_BASE}/api/chat/sessions/${id}`, {
       method: "DELETE",
       credentials: "include",
     });
@@ -182,7 +191,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
   async function send(event: React.FormEvent) {
     event.preventDefault();
     const question = input.trim();
-    if (!question || busy) return;
+    if (!question || busy || opening) return;
 
     setInput("");
     setError(null);
@@ -194,7 +203,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
     ]);
 
     try {
-      const response = await fetch(`${API_BASE}/api/chat`, {
+      const response = await apiFetch(`${API_BASE}/api/chat`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -261,7 +270,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
       next[index] = { ...next[index], feedback: rating };
       return next;
     });
-    await fetch(`${API_BASE}/api/feedback`, {
+    await apiFetch(`${API_BASE}/api/feedback`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -271,15 +280,26 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <>
-      <h1>แชท</h1>
-      <p className="sub">ตอบจากเอกสารที่อยู่ในคลังเท่านั้น พร้อมอ้างอิงที่มาทุกครั้ง</p>
-
-      {error && <div className="alert" role="alert">{error}</div>}
+      {error && (
+        <div className="alert" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="chat-layout">
-        <aside className="session-pane">
-          <button className="btn ghost" onClick={startNew} disabled={busy}>
-            + บทสนทนาใหม่
+        <button
+          type="button"
+          className="btn ghost history-toggle"
+          aria-expanded={historyOpen}
+          aria-controls="chat-history"
+          onClick={() => setHistoryOpen(!historyOpen)}
+        >
+          <Icon name="history" size={18} />
+          {historyOpen ? "ซ่อนประวัติ" : "ประวัติการสนทนา"}
+        </button>
+        <aside id="chat-history" className={`session-pane ${historyOpen ? "is-open" : ""}`}>
+          <button className="btn ghost" onClick={startNew} disabled={busy || opening}>
+            <Icon name="plus" size={18} /> บทสนทนาใหม่
           </button>
           {loadingHistory && <p className="muted">กำลังโหลดประวัติ…</p>}
           {!loadingHistory && sessions.length === 0 && <p className="muted">ยังไม่มีประวัติ</p>}
@@ -289,26 +309,22 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
                 <button
                   className="session-open"
                   onClick={() => openSession(s.id)}
-                  disabled={busy}
+                  disabled={busy || opening}
                   title={s.title}
                 >
                   <span className="session-title">{s.title}</span>
                   <span className="muted session-meta">
-                    {s.message_count} ข้อความ ·{" "}
-                    {new Date(s.last_message_at).toLocaleDateString("th-TH", {
-                      day: "numeric",
-                      month: "short",
-                    })}
+                    {s.message_count} ข้อความ · {formatDate(s.last_message_at)}
                   </span>
                 </button>
                 <button
                   className="session-del"
                   onClick={() => removeSession(s.id)}
-                  disabled={busy}
+                  disabled={busy || opening}
                   aria-label={`ลบบทสนทนา ${s.title}`}
                   title="ลบบทสนทนานี้"
                 >
-                  ✕
+                  <Icon name="trash" size={15} />
                 </button>
               </li>
             ))}
@@ -318,7 +334,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
             <button
               className="btn ghost"
               onClick={() => setSessionLimit((n) => n + SESSION_PAGE_SIZE)}
-              disabled={busy}
+              disabled={busy || opening}
             >
               โหลดเพิ่ม ({sessions.length}/{totalSessions})
             </button>
@@ -326,9 +342,53 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
         </aside>
 
         <div className="chat-main">
-          <div className="chat">
+          <div className="chat" ref={chatScroll} aria-busy={busy || opening}>
             {messages.length === 0 && !loadingHistory && (
-              <p className="muted">ยังไม่มีบทสนทนา ลองถามอะไรสักอย่างเกี่ยวกับเอกสารที่อัปโหลดไว้</p>
+              <div className="chat-empty">
+                <span className="empty-icon">
+                  <Icon name="chat" size={32} />
+                </span>
+                <h2>วันนี้อยากรู้อะไร?</h2>
+                <p>เลือกแนวคำถาม แล้วเติมหัวข้อหรือชื่อเอกสารที่อยู่ในคลังของคุณก่อนส่ง</p>
+                <div className="suggestions">
+                  {[
+                    {
+                      icon: "documents",
+                      title: "สรุปใจความสำคัญ",
+                      text: "ช่วยสรุปใจความสำคัญของเอกสาร ",
+                    },
+                    {
+                      icon: "search",
+                      title: "ค้นหาข้อมูลเฉพาะ",
+                      text: "ในเอกสารมีข้อมูลเกี่ยวกับ ",
+                    },
+                    { icon: "book", title: "อธิบายให้เข้าใจง่าย", text: "ช่วยอธิบายเรื่อง " },
+                    {
+                      icon: "playground",
+                      title: "เปรียบเทียบข้อมูล",
+                      text: "ช่วยเปรียบเทียบข้อมูลเรื่อง ",
+                    },
+                  ].map((item) => (
+                    <button
+                      type="button"
+                      className="suggestion"
+                      key={item.title}
+                      onClick={() => {
+                        setInput(item.text);
+                        composerInput.current?.focus();
+                      }}
+                    >
+                      <Icon name={item.icon} size={18} />
+                      {item.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {opening && (
+              <p role="status" className="muted">
+                กำลังเปิดบทสนทนา…
+              </p>
             )}
             {messages.map((message, index) => (
               <div key={index} className={`msg ${message.role}`}>
@@ -390,13 +450,16 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
 
           <form className="composer" onSubmit={send}>
             <input
+              ref={composerInput}
+              aria-label="คำถามถึงผู้ช่วย"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="พิมพ์คำถาม…"
-              disabled={busy}
+              disabled={busy || opening}
             />
-            <button className="btn" type="submit" disabled={busy || !input.trim()}>
-              ส่ง
+            <button className="btn" type="submit" disabled={busy || opening || !input.trim()}>
+              <Icon name="send" size={19} />
+              <span className="send-label">ส่ง</span>
             </button>
           </form>
         </div>

@@ -1,3 +1,4 @@
+import { Icon } from "@/components/Icon";
 import Link from "next/link";
 
 /** หน้า 404 ของระบบ
@@ -8,6 +9,9 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <main className="narrow">
+      <div className="empty-icon">
+        <Icon name="search" size={40} />
+      </div>
       <h1>ไม่พบหน้านี้</h1>
       <p className="sub">ลิงก์อาจพิมพ์ผิด หรือหน้านี้ถูกย้ายไปแล้ว</p>
 

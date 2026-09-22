@@ -22,6 +22,9 @@ async def login(
 ) -> TokenResponse:
     # ประตูหน้าบ้านต้องมีเพดานการลอง ไม่งั้นเดารหัสผ่านได้ไม่จำกัด
     # นับทุกครั้งที่เรียกรวมถึงครั้งที่สำเร็จ เพราะคนทั่วไปล็อกอินวันละไม่กี่ครั้ง
+    email = payload.email.lower()
+
+    # ชั้นที่หนึ่ง นับต่อ IP — เข้มงวด จับคนที่ยิงรัวจากที่เดียว
     await ratelimit.enforce(
         request,
         scope="login",
@@ -29,9 +32,23 @@ async def login(
         window_seconds=settings.rate_limit_login_window_seconds,
     )
 
-    result = await session.execute(
-        select(User).where(User.email == payload.email.lower())
+    # ชั้นที่สอง นับต่ออีเมล — หลวมกว่า เป็นตาข่ายรับคนที่หมุน IP หนีชั้นแรก
+    #
+    # ต้องมีทั้งสองชั้น ไม่ใช่เลือกอย่างใดอย่างหนึ่ง: ชั้น IP อย่างเดียวหลุดเมื่อ
+    # ผู้โจมตีมี IP หลายตัว ส่วนชั้นอีเมลอย่างเดียวเปิดช่องให้ยิงรหัสผิดใส่บัญชี
+    # คนอื่นจนเขาเข้าไม่ได้ · เมื่อชั้นอีเมลหลวมกว่ามาก การกลั่นแกล้งจึงแพงเกินคุ้ม
+    # ขณะที่การเดารหัสยังชนชั้น IP ก่อนเสมอ
+    #
+    # แฮชอีเมลก่อนใช้เป็นคีย์ เพื่อไม่ให้ Redis กลายเป็นรายชื่ออีเมลที่มีคนพยายามเข้า
+    await ratelimit.enforce(
+        request,
+        scope="login-email",
+        limit=settings.rate_limit_login_attempts_per_email,
+        window_seconds=settings.rate_limit_login_email_window_seconds,
+        subject=ratelimit.opaque_subject(email),
     )
+
+    result = await session.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
     # ตอบข้อความเดียวกันทั้งกรณีไม่มี user และรหัสผิด ไม่ให้เดาได้ว่าอีเมลไหนมีอยู่จริง

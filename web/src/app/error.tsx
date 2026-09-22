@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/Icon";
 import { useEffect } from "react";
 
 /** จอรับ error ที่หลุดออกมาจาก component
@@ -21,6 +22,9 @@ export default function ErrorBoundary({
 
   return (
     <main className="narrow">
+      <div className="empty-icon">
+        <Icon name="status" size={40} />
+      </div>
       <h1>หน้านี้ทำงานผิดพลาด</h1>
       <p className="sub">ระบบยังทำงานอยู่ เฉพาะหน้านี้ที่แสดงผลไม่สำเร็จ</p>
 
