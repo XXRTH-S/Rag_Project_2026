@@ -1,0 +1,34 @@
+# ไฟล์ที่ไม่ต้องอัปขึ้น Vercel ตอน deploy ฝั่ง API
+#
+# โปรเจกต์ Vercel ของ API ใช้ราก repo เป็น root directory (เพราะ @vercel/python
+# มองหา entrypoint ใน api/) จึงเห็นทุกอย่างในนี้ ถ้าไม่ตัดออก bundle จะพองขึ้น
+# โดยไม่มีประโยชน์ และเข้าใกล้เพดาน 250 MB เร็วเกินจำเป็น
+#
+# ฝั่งหน้าเว็บ deploy แยกเป็นอีกโปรเจกต์ที่ root เป็น web/ จึงไม่กระทบกัน
+
+web/
+corpus/
+artifacts/
+backups/
+output/
+caddy/
+.playwright-cli/
+.github/
+
+# เฉพาะของฝั่ง API ที่ function ไม่ได้ใช้
+api/tests/
+api/evalsets/
+api/scripts/
+api/alembic/
+api/alembic.ini
+api/Dockerfile
+api/.dockerignore
+
+# ของฝั่ง Docker และสคริปต์บนเครื่อง
+docker-compose*.yml
+*.ps1
+scripts/
+wslconfig.example
+
+# เอกสาร
+*.md

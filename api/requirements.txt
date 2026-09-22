@@ -1,0 +1,32 @@
+# รายการนี้ใช้เฉพาะตอนขึ้น Vercel — ที่อื่นใช้ pyproject.toml
+#
+# ตัดของที่มีแต่เส้นทางนำเข้าเอกสารใช้ออกทั้งหมด เพราะ serverless ทำ ingestion
+# ไม่ได้อยู่แล้ว (ดู INGESTION_ENABLED) และ bundle มีเพดาน 250 MB
+#
+# ที่ตัดออกและเหตุผล:
+#   uvicorn[standard]  Vercel มี ASGI server ของตัวเอง · ประหยัด uvloop 14 MB
+#   alembic            migration รันจากเครื่องที่มี Docker ไม่ใช่จาก function
+#   celery[redis]      ไม่มี worker บน serverless
+#   python-magic       ต้องมี libmagic ซึ่งเป็น system library
+#   pypdf, pillow      ใช้เฉพาะตอนอ่าน/เรนเดอร์หน้าเอกสาร
+#
+# ยืนยันแล้วว่า app.main import ผ่านโดยไม่มีของพวกนี้ (ทั้งหมดถูก import
+# แบบ lazy ในฟังก์ชันที่เกี่ยวข้องอยู่แล้ว) — เทสอยู่ใน tests/test_serverless_bundle.py
+#
+# pythainlp ยังต้องมี (65 MB) เพราะ keyword leg ของ hybrid retrieval ใช้ตัดคำไทย
+# ถอดออกแล้ว hit@1 ตกจาก 100% เหลือ 88% ซึ่งไม่คุ้มกับพื้นที่ที่ประหยัดได้
+
+fastapi>=0.115
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30
+pgvector>=0.3.6
+pydantic>=2.9
+pydantic-settings>=2.6
+redis>=5.2
+httpx>=0.27
+python-multipart>=0.0.12
+bcrypt>=4.2
+pyjwt>=2.9
+pythainlp>=5.0
+structlog>=24.4
+tenacity>=9.0
