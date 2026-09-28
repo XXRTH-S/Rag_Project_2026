@@ -21,10 +21,7 @@ export function useAuth(options?: { requireAdmin?: boolean }): State {
         if (cancelled) return;
         if (requireAdmin && user.role !== "admin") {
           router.replace("/documents");
-          // ต้องเคลียร์ loading ด้วย ไม่ใช่ return เฉย ๆ
-          // router.replace เปลี่ยนหน้าแบบ client-side ซึ่งใช้เวลาอยู่พักหนึ่ง
-          // ถ้าปล่อย loading ค้างเป็น true หน้าจะแช่อยู่ที่ "กำลังโหลด…" ทั้งที่
-          // โหลดเสร็จแล้ว และถ้า navigate ไม่สำเร็จก็ค้างตรงนั้นตลอดไป
+          // เคลียร์ loading ก่อนเปลี่ยนหน้า เพื่อไม่ให้ค้างหาก navigation ไม่สำเร็จ
           setState({ user: null, loading: false });
           return;
         }

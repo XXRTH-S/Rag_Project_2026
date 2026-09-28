@@ -4,6 +4,9 @@ from zoneinfo import ZoneInfo
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# ตัดพารามิเตอร์ของ libpq ที่ asyncpg ไม่รองรับออกจาก URL
+_LIBPQ_ONLY_PARAMS = {"sslmode", "channel_binding", "connect_timeout", "application_name"}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -14,10 +17,10 @@ class Settings(BaseSettings):
         protected_namespaces=(),
     )
 
-    # ---------- tier ----------
+    # tier
     model_tier: str = "local"
 
-    # ---------- LLM ----------
+    # LLM
     llm_base_url: str = "http://ollama:11434/v1"
     llm_api_key: str = ""
     llm_model: str = "qwen3.5:4b"
@@ -26,63 +29,50 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 1024
     llm_timeout_seconds: int = 180
     llm_enable_thinking: bool = False
-    # ค่าที่ส่งไปกับ reasoning_effort เมื่อปิด thinking
-    # "none" ใช้ได้กับ Ollama · ผู้ให้บริการบางเจ้าอาจรับแค่ "low"/"minimal"
-    # ตั้งเป็นค่าว่างเพื่อไม่ส่งฟิลด์นี้เลย ถ้าเจอ provider ที่ปฏิเสธ
+    # ตั้งค่าว่างหาก provider ไม่รองรับ reasoning_effort; Ollama ใช้ "none" เพื่อปิด thinking
     llm_reasoning_effort: str = "none"
 
-    # ---------- LLM สำรอง ----------
-    # ลำดับการเรียก: ตัวหลัก (LLM_*) -> ตัวสำรอง (LLM_FALLBACK_*) -> ยกข้อความจากเอกสาร
-    #
-    # ใช้เมื่ออยากให้ API เป็นหลักและโมเดลในเครื่องเป็นตัวสำรองเวลา key มีปัญหา
-    # (หมดโควตา โดน rate limit เน็ตล่ม) หรือกลับกันก็ได้ แค่สลับค่าสองชุดนี้
-    # เว้น base_url ว่างเพื่อปิดตัวสำรอง
+    # LLM สำรอง
+    # เรียก LLM หลัก แล้วลองตัวสำรอง; เว้น base_url ว่างเพื่อปิดตัวสำรอง
     llm_fallback_base_url: str = ""
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = ""
     # หยุดเรียกตัวหลักชั่วคราวหลังล้มติดกันกี่ครั้ง — กันไม่ให้ทุกคำถามต้องรอ timeout
     llm_breaker_threshold: int = 3
     llm_breaker_cooldown_seconds: int = 120
-    # เมื่อเรียก LLM ไม่ได้ (ยังไม่ได้ pull โมเดล / บริการล่ม) ให้ยกข้อความจากเอกสาร
-    # ที่ค้นเจอมาแสดงแทนการโยน error ใส่ผู้ใช้ — ระบบยังมีประโยชน์แม้โมเดลไม่พร้อม
-    # ตั้ง false ถ้าอยากให้ล้มดัง ๆ เพื่อไม่ให้ปัญหาถูกกลบ
+    # แสดงข้อความจากเอกสารแทนเมื่อ LLM ใช้งานไม่ได้; ตั้ง false เพื่อคืนข้อผิดพลาด
     llm_fallback_to_excerpts: bool = True
-    # โหลดโมเดลเข้า VRAM ตอน API เริ่ม เพื่อให้คำถามแรกไม่ต้องรอ 21 วินาที
-    # ปิดได้ถ้าไม่อยากให้ VRAM ถูกจองไว้ตั้งแต่เปิดเครื่อง
+    # โหลดโมเดลล่วงหน้าเพื่อลดเวลารอคำถามแรก; ปิดได้เพื่อคืน VRAM ให้บริการอื่น
     llm_warmup_on_start: bool = True
 
-    # ---------- OCR ----------
+    # OCR
     typhoon_ocr_base_url: str = "http://ollama:11434/v1"
     typhoon_ocr_api_key: str = ""
     typhoon_ocr_model: str = "typhoon-ocr"
     typhoon_ocr_task_type: str = "default"
     typhoon_ocr_concurrency: int = 1
     typhoon_ocr_page_timeout: int = 120
-    # หน้าที่ text layer ให้ตัวอักษรน้อยกว่านี้ ถือว่าเป็นหน้าสแกน ต้องส่งเข้า OCR
-    # เอกสารไทยส่วนใหญ่เป็น PDF ผสม การตัดสินรายหน้าจึงประหยัดเวลามหาศาล
+    # ส่งหน้าเข้า OCR เมื่อข้อความที่อ่านได้มีน้อยกว่าเกณฑ์นี้
     ocr_min_chars_per_page: int = 50
-    # ใช้คำนวณ ETA ให้ user เห็นก่อนกดอัปโหลด
-    # วัดจริงบน RTX 3050 + typhoon-ocr1.5-2b Q4 (8 ก.ย. 2026): 5.2 วิ/หน้า ที่ 72.7 tok/s
-    # แต่หน้าที่วัดเป็นภาพเรนเดอร์สะอาด สแกนจริงมี noise/เอียง/ลายมือ จะช้ากว่านี้
-    # จึงตั้ง 10 เผื่อไว้ — ค่าจริงดูได้จาก /api/admin/analytics/ingestion (seconds_per_page)
+    # เวลาประมาณต่อหน้าสำหรับคำนวณ ETA; ปรับตามสถิติ ingestion ของเครื่องที่ใช้
     ocr_seconds_per_page: float = 10.0
-    # งานที่เข้าคิวไว้แต่ไม่เคยถูกหยิบไปทำนานเกินนี้ ถือว่า worker ตายไปแล้ว
-    # แล้วปล่อยให้ admin สั่งประมวลผลใหม่ได้ ไม่งั้นเอกสารนั้นค้างถาวร
-    # ตั้งสูงกว่าเวลารอคิวจริงที่ยาวที่สุดที่ยอมรับได้ — คิวยาวไม่ใช่คิวตาย
+    # อนุญาตให้ประมวลผลงานค้างใหม่หลังเวลานี้; ควรตั้งให้มากกว่าเวลารอคิวปกติ
     ingestion_stale_after_minutes: int = 30
 
-    # ---------- Embedding ----------
+    # Embedding
     embedding_base_url: str = "http://embeddings:8080"
     embedding_model: str = "BAAI/bge-m3"
     embedding_dim: int = 1024
     embedding_device: str = "cpu"
     embedding_api_key: str = ""
 
-    # ---------- Datastores ----------
+    # Datastores
     database_url: str = "postgresql+asyncpg://rag:changeme@postgres:5432/rag"
     redis_url: str = "redis://redis:6379/0"
+    # ปิด pool บน serverless เพื่อจำกัดจำนวน connection รวมจากหลาย instance
+    db_pool_enabled: bool = True
 
-    # ---------- Quota ----------
+    # Quota
     quota_timezone: str = "Asia/Bangkok"
     user_daily_document_limit: int = 5
     user_daily_page_limit: int = 500
@@ -90,49 +80,20 @@ class Settings(BaseSettings):
     admin_unlimited: bool = True
     chars_per_page_estimate: int = 3000
 
-    # ---------- Retrieval ----------
-    # วัดกับ qwen3.5:4b บน RTX 3050 (9 ก.ย. 2026) คำถามเดียวกัน คำตอบถูกทุกค่า:
-    #   top_k=8 -> 28.5 วิ · top_k=4 -> 23.8 วิ · top_k=2 -> 19.2 วิ
-    # เวลาส่วนใหญ่หมดไปกับ prefill ของ context ไม่ใช่การ generate
-    # เลือก 5 เพราะ eval ได้ hit@1 100% ที่ค่านี้ (ดู scripts/eval.py) และเร็วกว่า 8
+    # Retrieval
+    # จำกัดจำนวน chunk ที่ส่งให้ LLM เพื่อลดขนาด context และเวลาตอบ
     retrieval_top_k: int = 5
-    # วัดกับ bge-m3 บนเอกสารไทยจริง (8 ก.ย. 2026):
-    #   คำถามที่มีคำตอบในเอกสาร  0.67-0.79
-    #   คำถามที่ไม่มีคำตอบ        0.25-0.39
-    # ค่าเดิม 0.35 ตกอยู่ในช่วงของกลุ่มที่ไม่เกี่ยว ทำให้ chunk ที่ไม่เกี่ยวหลุดไปถึง LLM
-    # 0.5 อยู่กลางช่องว่างระหว่างสองกลุ่ม — วัดซ้ำได้จาก Playground เมื่อเปลี่ยนโมเดล embedding
+    # เกณฑ์ similarity ขั้นต่ำ; ควรประเมินใหม่เมื่อเปลี่ยน embedding หรือชุดเอกสาร
     retrieval_min_score: float = 0.5
-    # เปิดใช้ keyword leg ร่วมกับ vector (RRF)
-    # วัดกับ evalsets/hr.json (8 ก.ย. 2026): hit@1 88% -> 100%, MRR 0.882 -> 1.000
-    # ช่วยมากกับคำถามเชิงโครงสร้าง ("ข้อ 3 พูดถึงอะไร", "ประกาศออกเมื่อไหร่")
-    # ซึ่ง dense retrieval หาไม่เจอเพราะความหมายทับกับเนื้อหาน้อย
+    # รวมผลค้นแบบ keyword และ vector ด้วย RRF
     retrieval_hybrid: bool = True
-    # เกณฑ์สำหรับ chunk ที่ keyword หาเจอแต่ vector ไม่เจอ — ต่ำกว่า min_score ได้
-    # เพราะการตรงคำเป็นหลักฐานเพิ่มเติม แต่ยังต้องกัน chunk ที่ไม่เกี่ยวเลย
-    #
-    # ปรับจาก 0.35 เป็น 0.40 หลังเติมคลังด้วยเอกสารคนละหมวด (9 ก.ย. 2026)
-    # คลังหลายหมวดทำให้คำไปซ้ำข้ามเรื่องกันเอง เช่นคำถาม "นโยบายการทำงานจากที่บ้าน"
-    # ไปตรงกับหัวข้อ "การทำงานแบบอะซิงโครนัส" ของ JavaScript ที่คะแนน 0.356
-    #
-    # วัดกับ evalsets/hr.json บนคลัง 85 chunk ที่มีทั้ง HR และคู่มือเขียนโปรแกรม:
-    #   0.35 -> hit@1 100% · ปฏิเสธถูก 50%
-    #   0.40 -> hit@1 100% · ปฏิเสธถูก 62%   <- เลือกค่านี้ ดีขึ้นโดยไม่เสียอะไร
-    #   0.45 -> hit@1  94% · ปฏิเสธถูก 75%   เริ่มแลกคำตอบที่หาเจอทิ้ง
-    # ไม่ดันไปถึง 0.45 เพราะชั้น LLM ปฏิเสธ chunk ที่ไม่เกี่ยวได้อยู่แล้ว
-    # การหาคำตอบไม่เจอเสียหายกว่าการส่ง chunk อ่อน ๆ ให้โมเดลอ่านแล้วมันปฏิเสธเอง
+    # ใช้เกณฑ์ similarity ที่ต่ำลงเมื่อคำค้นตรง เพื่อช่วยค้นหัวข้อและเลขข้อ
     retrieval_keyword_floor: float = 0.40
     chunk_size: int = 800
     chunk_overlap: int = 120
 
-    # ---------- App ----------
-    # เส้นทางนำเข้าเอกสารทำงานได้เฉพาะที่ที่มีของครบสามอย่าง:
-    #   1. Celery worker  — OCR ใช้เวลาเป็นนาที ทำใน request ไม่ได้
-    #   2. poppler + libmagic — เป็น system binary ไม่ใช่แพ็กเกจ Python
-    #   3. ดิสก์ที่เขียนได้จริงและอยู่ถาวร — UPLOAD_DIR
-    #
-    # บน serverless (Vercel) ไม่มีทั้งสามอย่าง ตั้งเป็น false แล้ว endpoint
-    # อัปโหลด/bulk/reprocess จะตอบ 503 พร้อมบอกว่าให้ไปทำที่ไหน
-    # ดีกว่าปล่อยให้ล้มด้วย ImportError หรือไฟล์หายตอน container ถูกรีไซเคิล
+    # App
+    # เปิด ingestion เฉพาะระบบที่มี worker, poppler, libmagic และพื้นที่เก็บไฟล์ถาวร
     ingestion_enabled: bool = True
     app_secret_key: str = "dev-only-change-me"
     admin_email: str = ""
@@ -145,30 +106,23 @@ class Settings(BaseSettings):
     # False สำหรับ http://localhost ตอน dev — ต้องตั้งเป็น true เมื่อเปิด HTTPS จริง
     # ไม่งั้น browser จะส่ง cookie ผ่าน http ธรรมดาได้
     cookie_secure: bool = False
-    # /docs /redoc /openapi.json — แจกผังของทั้ง API รวมถึง endpoint ฝั่ง admin
-    # ให้คนที่ยังไม่ได้ล็อกอิน จึงต้องปิดเมื่อขึ้นใช้จริง
-    #
-    # default เป็น false โดยตั้งใจ — ค่าเริ่มต้นต้องพังไปทางปลอดภัยเมื่อคนลืมตั้ง
-    # เดิม default เป็น true แล้วหวังให้คนจำได้ว่าต้องปิด ซึ่งลืมจริงตอนเปิด tunnel
-    # ให้คนนอกเข้ามาดู · ตอน dev เปิดผ่าน docker-compose.override.yml ซึ่งเป็น
-    # ไฟล์ที่ใช้เฉพาะเครื่องนักพัฒนาอยู่แล้ว
+    # ปิดเอกสาร API บนระบบที่เปิดให้ภายนอก; เปิดเฉพาะตอนพัฒนาผ่าน override
     api_docs_enabled: bool = False
 
-    # ---------- บุคลิกของผู้ช่วย ----------
+    # บุคลิกของผู้ช่วย
     # คำลงท้ายสุภาพภาษาไทย — "ครับ" หรือ "ค่ะ" แล้วแต่บุคลิกที่องค์กรเลือก
     # ตั้งเป็นค่าว่างถ้าไม่ต้องการคำลงท้าย (เช่น ใช้กับผู้ใช้ต่างชาติเป็นหลัก)
     bot_polite_particle: str = "ครับ"
 
-    # ---------- Chat widget ----------
+    # Chat widget
     widget_title: str = "ผู้ช่วยตอบคำถาม"
-    # ใช้ "เรา" ให้ตรงกับสรรพนามที่สั่งไว้ใน system prompt
-    # ไม่งั้นข้อความต้อนรับกับคำตอบจะเรียกตัวเองคนละแบบในบทสนทนาเดียว
+    # ใช้สรรพนามเดียวกับ system prompt
     widget_greeting: str = "ถามอะไรก็ได้เกี่ยวกับเอกสารในระบบ เราจะตอบพร้อมอ้างอิงที่มาให้"
     widget_accent_color: str = "#4f46e5"
     # คั่นด้วย | เพื่อให้แก้ใน .env ได้โดยไม่ต้องยุ่งกับ JSON
     widget_suggestions: str = "ลาพักร้อนได้กี่วัน|เบิกค่าเดินทางอย่างไร"
 
-    # ---------- Rate limit ----------
+    # Rate limit
     # คุม "ความถี่" ต่างจากโควตาที่คุม "ปริมาณต่อวัน" — แชทไม่กินโควตาแต่กิน GPU ทุกครั้ง
     rate_limit_chat_per_minute: int = 20
     rate_limit_upload_per_hour: int = 60
@@ -189,28 +143,56 @@ class Settings(BaseSettings):
     # ตั้ง 0 เพื่อปิดชั้นนี้
     rate_limit_login_attempts_per_email: int = 30
     rate_limit_login_email_window_seconds: int = 900
-    # playground เรียกโมเดลเหมือน /api/chat ทุกประการ ถ้าไม่คุมก็เลี่ยงเพดานของแชท
-    # ได้ด้วยการยิงทาง playground แทน · ตั้งต่ำกว่าเพราะเป็นเครื่องมือทดลอง ไม่ใช่ทางใช้งานหลัก
+    # จำกัด Playground แยกด้วย เพราะใช้ทรัพยากร LLM ร่วมกับแชท
     rate_limit_playground_per_minute: int = 10
 
-    # จำนวน proxy ที่ "เราคุมเอง" ที่คั่นอยู่หน้า API · แต่ละตัวต่อท้าย X-Forwarded-For
-    # ด้วยที่อยู่ของผู้เรียกที่ตัวมันเองเห็น
-    #
-    #   0  API เปิดตรงออกอินเทอร์เน็ต — ห้ามเชื่อ header เลย ใครก็ปลอมได้
-    #   1  หลัง Caddy ของเราเอง (docker-compose.yml ตามปกติ)
-    #   2  หลัง ngrok แล้วต่อเข้า Caddy (docker-compose.https.yml)
-    #
-    # ทำไมต้องเป็นจำนวนชั้น ไม่ใช่ true/false: `client_ip()` ต้องหยิบ entry ที่
-    # hop นอกสุดที่เราเชื่อเขียนไว้ ซึ่งนับจาก *ขวา* เข้ามาเท่ากับจำนวนชั้น
-    # entry ที่อยู่ซ้ายกว่านั้นผู้เรียกแต่งมาเองได้ทั้งหมด
-    #
-    # ค่านี้ต้องตรงกับความจริงของ deployment — ตั้งสูงเกินไปเท่ากับหยิบ entry
-    # ที่ผู้เรียกแต่งเองมาใช้เป็น IP ซึ่งเปิดช่องให้เลี่ยง rate limit ได้ทั้งระบบ
+    # จำนวน proxy ที่เชื่อถือได้: 0 = ต่อตรง, 1 = Caddy, 2 = ngrok + Caddy
+    # นับ X-Forwarded-For จากขวา; ห้ามตั้งเกินจำนวน proxy จริง เพราะอาจเชื่อ IP ที่ผู้เรียกปลอมมา
     trusted_proxy_hops: int = 1
 
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+
+    @property
+    def sqlalchemy_url(self) -> str:
+        """DATABASE_URL ที่ SQLAlchemy ใช้ได้จริง
+
+        ผู้ให้บริการ Postgres แบบ managed (Neon, Supabase, Railway) คืน URL
+        ที่ขึ้นต้นด้วย `postgresql://` หรือ `postgres://` ซึ่ง SQLAlchemy แปลว่า
+        "ใช้ psycopg2" — แต่เราไม่ได้ติดตั้ง psycopg2 เพราะโปรเจกต์นี้ใช้ asyncpg
+        ผลคือ `create_async_engine` ล้มตั้งแต่ตอน import ด้วย ModuleNotFoundError
+        ซึ่งบน serverless โผล่มาเป็นแค่ FUNCTION_INVOCATION_FAILED ตามหาต้นเหตุไม่ได้
+
+        เติม +asyncpg ให้เองแทนที่จะให้คนจำ เพราะการวาง URL ที่เขาให้มาตรง ๆ
+        คือสิ่งที่ทุกคนทำ และความผิดพลาดนี้ไม่มีสัญญาณอะไรบอกเลย
+
+        ตัด query param ที่เป็นของ libpq ออกด้วย — asyncpg ไม่รู้จัก `sslmode`
+        กับ `channel_binding` แล้วจะโยน TypeError · ค่า sslmode ถูกแปลงไปเป็น
+        connect_args แทน (ดู database_connect_args)
+        """
+        from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+        parts = urlsplit(self.database_url)
+        scheme = parts.scheme
+        if scheme in ("postgres", "postgresql"):
+            scheme = "postgresql+asyncpg"
+
+        keep = [(k, v) for k, v in parse_qsl(parts.query) if k not in _LIBPQ_ONLY_PARAMS]
+        return urlunsplit(parts._replace(scheme=scheme, query=urlencode(keep)))
+
+    @property
+    def database_connect_args(self) -> dict:
+        """ค่าที่ต้องส่งให้ asyncpg โดยตรง ไม่ใช่ผ่าน URL"""
+        from urllib.parse import parse_qsl, urlsplit
+
+        query = dict(parse_qsl(urlsplit(self.database_url).query))
+        sslmode = query.get("sslmode")
+        # asyncpg รับ sslmode เป็นอาร์กิวเมนต์ชื่อ ssl ไม่ใช่ query param
+        # 'disable' คือค่าเริ่มต้นอยู่แล้ว ไม่ต้องส่ง
+        if sslmode and sslmode != "disable":
+            return {"ssl": sslmode}
+        return {}
 
     @property
     def tz(self) -> ZoneInfo:

@@ -28,17 +28,11 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # bge-m3 บน CPU — GPU 6GB ต้องสงวนไว้ให้ Ollama ทั้งหมด
-  #
-  # pin ด้วย digest ไม่ใช่ tag: cpu-1.5 (hf-hub 0.3.2) โหลด bge-m3 ไม่ได้เลย
-  # ล้มด้วย "relative URL without a base" เพราะ parse relative redirect ของ HF CDN ไม่ได้
-  # digest นี้คือ cpu-latest ณ วันที่ตรวจ = text-embeddings-router 1.9.3
+  # รัน bge-m3 บน CPU เพื่อเหลือ VRAM ให้ Ollama
+  # ตรึง TEI 1.9.3 ด้วย digest เพื่อเลี่ยงปัญหา redirect ของรุ่นเก่า
   embeddings:
     image: ghcr.io/huggingface/text-embeddings-inference@sha256:cb570aabbfa016b86684f576b5bd72d1ee96cc0b7a00b0ad221b298762b32157
-    # ค่า default ของ TEI (max-batch-tokens 16384, tokenization workers = จำนวน CPU)
-    # ทำให้ขั้น "Warming up model" ถูก SIGKILL (exit 137) บน WSL VM ที่มี RAM 8GB
-    # bge-m3 ONNX กิน ~2.5GB อยู่แล้ว การ warmup ด้วย batch 16k token ดันทะลุเพดาน
-    # 4096 token/batch พอสำหรับ chunk ขนาด ~800 ตัวอักษรของเรา (ราว 300 token/chunk)
+    # จำกัด batch และ worker เพื่อไม่ให้ TEI ใช้ RAM เกินระหว่าง warmup
     command:
       - --model-id
       - BAAI/bge-m3
@@ -51,9 +45,7 @@ services:
       - "16"
       - --tokenization-workers
       - "2"
-    # ไม่ตั้ง HF_TOKEN: bge-m3 เป็น public model และ HF_TOKEN ที่เป็นสตริงว่าง
-    # ทำให้ hf-hub ใน TEI พังด้วย "relative URL without a base"
-    # ถ้าวันหลังต้องใช้โมเดล gated ค่อยเพิ่ม environment: {HF_TOKEN: "${HF_TOKEN}"} กลับมา
+    # bge-m3 เป็นโมเดลสาธารณะ; เพิ่ม HF_TOKEN เฉพาะเมื่อต้องใช้โมเดล gated
     volumes:
       - hf-cache:/data
     healthcheck:

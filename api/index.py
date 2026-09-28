@@ -17,8 +17,13 @@ Vercel มองหาไฟล์ใน `api/` แล้วรันเป็�
 ค่าที่ต้องตั้งบน Vercel (ดู README หัวข้อ "ขึ้น Vercel"):
   DATABASE_URL  REDIS_URL  APP_SECRET_KEY  LLM_BASE_URL  LLM_API_KEY
   LLM_MODEL  EMBEDDING_BASE_URL  EMBEDDING_API_KEY
-  INGESTION_ENABLED=false  API_DOCS_ENABLED=false  COOKIE_SECURE=true
+  INGESTION_ENABLED=false  DB_POOL_ENABLED=false
+  API_DOCS_ENABLED=false  COOKIE_SECURE=true
   TRUSTED_PROXY_HOPS=1  CORS_ALLOWED_ORIGINS=<โดเมนของ frontend>
+  PYTHAINLP_DATA_DIR=/tmp/pythainlp  (ระบบไฟล์เขียนได้แค่ /tmp)
+
+ถ้าเจอ FUNCTION_INVOCATION_FAILED: สาเหตุอยู่ใน log ของ function เสมอ
+(`npx vercel logs <โดเมน>`) หน้าเว็บไม่แสดงให้ · README มีตารางเทียบอาการ
 """
 
 import sys

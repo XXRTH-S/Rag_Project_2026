@@ -48,11 +48,7 @@ export default function StatusPage() {
         })
         .catch((e) => setError(String(e)));
 
-    // หยุดถามเมื่อไม่มีใครดูอยู่
-    //
-    // การเช็คหนึ่งครั้งไม่ได้ถูก — มันไล่ต่อ Postgres, Redis, TEI และถาม Ollama
-    // ว่าโมเดลไหนค้างอยู่ใน VRAM · เปิดแท็บนี้ทิ้งไว้ข้ามคืนคือยิงชุดนั้น
-    // แปดพันกว่ารอบโดยไม่มีใครอ่านผลเลย บนเครื่องที่ต้องเอาแรงไปให้ OCR กับ LLM
+    // หยุดตรวจสถานะเมื่อซ่อนแท็บ เพื่อลดคำขอไปยังบริการต่าง ๆ
     let timer: ReturnType<typeof setInterval> | null = null;
 
     const start = () => {

@@ -4,7 +4,7 @@ COPY package.json package-lock.json* ./
 RUN npm install
 
 
-# ---- dev: hot reload, โค้ด mount ทับจาก host ----
+# dev: hot reload, โค้ด mount ทับจาก host
 FROM node:22-alpine AS dev
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -22,7 +22,7 @@ COPY . .
 RUN npm run build
 
 
-# ---- prod: standalone output, image เล็ก ----
+# prod: standalone output, image เล็ก
 FROM node:22-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1

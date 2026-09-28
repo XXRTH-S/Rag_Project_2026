@@ -1,8 +1,4 @@
-# Tier LOCAL — Ollama บน RTX 3050 6GB (ดู PLAN.md ข้อ 3 และ 6.1)
-#
-# ยืนยันแล้วว่า GPU passthrough ทำงาน:
-#   docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
-#   -> NVIDIA GeForce RTX 3050, 6144 MiB total, 4300 MiB free
+# Ollama สำหรับ RTX 3050 6GB
 
 services:
   ollama:
@@ -11,16 +7,11 @@ services:
       # 6GB โหลดสองโมเดลพร้อมกันไม่ได้ ค่านี้เป็นข้อบังคับ ไม่ใช่การจูน
       OLLAMA_MAX_LOADED_MODELS: "1"
       OLLAMA_NUM_PARALLEL: "1"
-      # 5m สั้นเกินไปสำหรับการใช้งานจริง — ทิ้งไว้พักเดียวโมเดลถูกถอดออกจาก VRAM
-      # แล้วคำถามถัดไปเสียเวลาโหลดใหม่ 21 วินาที (วัดจริง: เย็น 36.8 วิ · อุ่น 15.2 วิ)
-      # ผู้ใช้เห็นหน้าจอนิ่งจนคิดว่าระบบค้างแล้วถามซ้ำ
+      # เก็บโมเดลใน VRAM นานขึ้นเพื่อลดการโหลดใหม่ระหว่างคำถาม
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-1h}
-      # ค่า default 4 stream พร้อมกันทำให้บนลิงก์ที่สะดุดบ่อยเกิด "part stalled; retrying"
-      # ถี่มากจนความเร็วจริงเหลือ ~23 KB/s ทั้งที่ลิงก์ทำได้ ~230 KB/s
-      # stream เดียวช้าแต่ไม่ทิ้งงานที่โหลดไปแล้ว
+      # โหลดทีละ stream เพื่อลดการ retry บนเครือข่ายที่ไม่เสถียร
       OLLAMA_MAX_TRANSFER_STREAMS: ${OLLAMA_MAX_TRANSFER_STREAMS:-1}
-      # Ollama ลบ blob ที่ยังไม่มี manifest อ้างถึงทุกครั้งที่ start
-      # ทำให้ไฟล์ที่โหลดค้างไว้หายหมดเมื่อ restart — เสียเวลาโหลดใหม่เป็นชั่วโมง
+      # ป้องกันการลบ blob ที่ยังโหลดไม่เสร็จเมื่อ restart
       OLLAMA_NOPRUNE: "1"
     volumes:
       # named volume เท่านั้น — bind mount ไป NTFS ทำให้โหลดโมเดลช้ามาก

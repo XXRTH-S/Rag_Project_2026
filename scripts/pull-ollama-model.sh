@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
-# ดึงโมเดลจาก Ollama registry พร้อมตัวจับอาการค้าง
-#
-# ทำไมต้องมี watchdog:
-#   `ollama pull` ค้างเงียบ ๆ ได้ไม่จำกัดเวลาเมื่อการเชื่อมต่อตาย — ไม่ error ไม่ timeout
-#   เจอมาแล้ว: หยุดนิ่งที่ 585 MB นาน 90 นาทีโดยไม่มีอะไรบอก เสียเวลาฟรี
-#   ตัว timeout ของ shell ช่วยไม่พอเพราะกว่าจะครบก็เสียเวลาไปมากแล้ว
-#
-# วิธีทำงาน: เฝ้าขนาด blob ถ้าไม่โตขึ้นภายใน STALL_LIMIT วินาที ให้ฆ่า pull
-# แล้ว restart ollama (ตัด pull ฝั่ง server ที่ค้าง) จากนั้นเริ่มใหม่
-# ความคืบหน้าไม่หายเพราะตั้ง OLLAMA_NOPRUNE=1 ไว้ใน docker-compose.local.yml
-#
+# ติดตามขนาด blob และ restart Ollama เมื่อไม่คืบหน้าภายใน STALL_LIMIT
+# ต้องตั้ง OLLAMA_NOPRUNE=1 เพื่อเก็บข้อมูลที่โหลดค้างไว้
 # ใช้: bash scripts/pull-ollama-model.sh qwen3.5:4b [ชื่อ alias]
 
 set -u

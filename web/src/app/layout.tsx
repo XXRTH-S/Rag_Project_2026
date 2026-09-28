@@ -17,10 +17,7 @@ export const metadata: Metadata = {
   description: "ระบบ RAG chatbot พร้อม ingestion + OCR",
 };
 
-// ต้องทำงานก่อนวาดหน้าแรก ไม่งั้นคนที่เลือกโหมดมืดไว้จะเห็นหน้าสว่างวาบหนึ่งเฟรม
-// ก่อนจะสลับ · อยู่ใน <head> แบบ blocking โดยตั้งใจ สคริปต์สั้นพอที่จะไม่หน่วงอะไร
-//
-// ไม่แตะอะไรเลยเมื่อยังไม่เคยเลือก — CSS จะใช้ prefers-color-scheme ตามเครื่องเอง
+// อ่านธีมใน head ก่อนวาดหน้าเพื่อลดการกะพริบ; หากยังไม่เลือกให้ใช้ค่าของเครื่อง
 const THEME_BOOTSTRAP = `try{var t=localStorage.getItem("rag-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -2,23 +2,16 @@ services:
   api:
     environment:
       COOKIE_SECURE: 'true'
-      # ไฟล์นี้ซ้อนทับ docker-compose.override.yml ตามคำสั่งใน DEMO.md
-      # ซึ่งเปิด /docs ไว้สำหรับ dev — ต้องปิดกลับที่นี่ ไม่งั้น tunnel
-      # จะแจกผังของทั้ง API ให้คนที่ยังไม่ได้ล็อกอิน
+      # ปิดเอกสาร API แม้ใช้ร่วมกับ dev override
       API_DOCS_ENABLED: 'false'
-      # สองชั้น: ngrok แล้วต่อเข้า Caddy · ทั้งคู่ต่อท้าย X-Forwarded-For
-      # ด้วยที่อยู่ของผู้เรียกที่ตัวเองเห็น API จึงต้องนับเข้ามาสองชั้นจากขวา
-      # จึงจะได้ IP จริงของผู้ใช้แทนที่จะได้ IP ของคอนเทนเนอร์ ngrok ทุกคำขอ
+      # ngrok และ Caddy ต่อท้าย X-Forwarded-For; API จึงนับจากขวาสอง hop
       TRUSTED_PROXY_HOPS: '2'
   ngrok:
     image: ngrok/ngrok:latest
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:?Set NGROK_AUTHTOKEN in .env}
-    # ชี้เข้า Caddy ไม่ใช่ api:8000 ตรง ๆ — ได้สองอย่างที่เส้นทางตรงไม่มี:
-    #   1. Caddy ต่อท้าย X-Forwarded-For ให้ rate limit แยกต่อผู้ใช้ได้จริง
-    #   2. flush_interval -1 ที่กัน SSE ของ /api/chat ถูก buffer
-    #      ซึ่งเป็นเส้นทางที่ใช้โชว์แชทตอน demo พอดี
-    command: ["http", "http://caddy:80", "--inspect=false"]
+    # ผ่าน Caddy เพื่อส่งต่อ IP และส่ง SSE โดยไม่ buffer
+    command: ["http", "http://caddy:80", "--inspect=false", "--url=${NGROK_URL:?Set NGROK_URL to your ngrok dev domain in .env}"]
     depends_on:
       api:
         condition: service_healthy

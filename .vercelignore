@@ -6,7 +6,6 @@
 #
 # ฝั่งหน้าเว็บ deploy แยกเป็นอีกโปรเจกต์ที่ root เป็น web/ จึงไม่กระทบกัน
 
-web/
 corpus/
 artifacts/
 backups/
@@ -32,3 +31,6 @@ wslconfig.example
 
 # เอกสาร
 *.md
+
+# Never upload environment files from any project directory.
+**/.env*

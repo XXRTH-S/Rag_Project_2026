@@ -116,9 +116,7 @@ async def playground_query(
         system_prompt=payload.system_prompt,
         temperature=payload.temperature,
         enable_thinking=payload.enable_thinking,
-        # ส่ง chunk ที่ค้นไว้แล้วเข้าไป ไม่ให้ค้นซ้ำ — นอกจากเสียเวลา embedding สองเท่า
-        # ยังทำให้ chunk ที่โชว์ให้ admin ดูอาจไม่ใช่ชุดเดียวกับที่ส่งให้ LLM
-        # ซึ่งทำลายจุดประสงค์ของ Playground ที่มีไว้ debug พอดี
+        # ใช้ผลค้นชุดเดียวกับที่แสดงใน Playground เพื่อไม่ค้นซ้ำและให้ตรวจคำตอบได้ตรงกัน
         hits=hits,
     )
 
@@ -205,9 +203,7 @@ async def activate_prompt_config(
     if config is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "ไม่พบ prompt config")
 
-    # ต้องปิดตัวเดิมก่อนเปิดตัวใหม่ ไม่ใช่ทำพร้อมกัน — DB มี unique index
-    # บน (is_active) WHERE is_active ที่บังคับว่ามี active ได้แค่ตัวเดียว
-    # ถ้าเปิดตัวใหม่ก่อนจะชน constraint ทันที
+    # ปิด prompt เดิมก่อนเปิดตัวใหม่ เพื่อไม่ชน unique index ของ is_active
     await session.execute(
         update(PromptConfig).where(PromptConfig.is_active).values(is_active=False)
     )

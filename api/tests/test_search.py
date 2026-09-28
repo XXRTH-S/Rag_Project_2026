@@ -182,3 +182,30 @@ async def test_chunks_without_embedding_are_skipped(
 
     hits = await search(session, _vector(axis=0), min_score=-1.0)
     assert [h.text for h in hits] == ["มีเวกเตอร์"]
+
+
+def test_tokenize_degrades_instead_of_failing(monkeypatch) -> None:
+    """ตัวตัดคำใช้ไม่ได้ต้องไม่ลากทั้งคำขอไปด้วย
+
+    keyword leg เป็นส่วนเสริมของ vector search การล้มทั้งคำถามเพราะส่วนเสริม
+    ใช้ไม่ได้เป็นการแลกที่ผิด · เจอจริงบน Vercel ตอน pythainlp เขียนไดเรกทอรี
+    ข้อมูลใน HOME ไม่ได้ (ระบบไฟล์อ่านอย่างเดียว) แล้วทุกคำถามล้ม
+    ทั้งที่ vector search ทำงานได้ปกติ
+    """
+    import builtins
+
+    from app.retrieval import keywords
+
+    real_import = builtins.__import__
+
+    def refuse_pythainlp(name, *args, **kwargs):
+        if name.startswith("pythainlp"):
+            raise OSError("จำลองว่าระบบไฟล์เขียนไม่ได้")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", refuse_pythainlp)
+    monkeypatch.setattr(keywords, "_warned_about_tokenizer", False)
+
+    # ต้องไม่โยน exception และยังต้องได้คำที่คั่นด้วยช่องว่างตามปกติ
+    assert keywords.tokenize("annual leave 2026") == ["annual", "leave", "2026"]
+    assert keywords.to_tsquery("annual leave") == "annual | leave"

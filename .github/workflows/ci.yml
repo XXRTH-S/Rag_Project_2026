@@ -1,11 +1,6 @@
 name: CI
 
-# รันเทสทุกครั้งที่ push หรือเปิด PR
-#
-# ไม่ต้องมี GPU: เทสฝั่ง API stub ทั้ง LLM, OCR และ embedding ไว้หมดแล้ว
-# ที่ต้องมีจริงคือ Postgres (ต้องเป็น pgvector เพราะ migration สร้างคอลัมน์ vector)
-# กับ Redis (rate limit เทสกับของจริง ไม่ mock เพราะสิ่งที่ต้องพิสูจน์คือ
-# INCR/EXPIRE ทำงานถูกและ key หมดอายุจริง)
+# เทสใช้ Postgres/pgvector และ Redis จริง ส่วน LLM, OCR และ embedding ใช้ stub
 
 on:
   push:
@@ -86,8 +81,7 @@ jobs:
 
       - name: ติดตั้ง dependency
         working-directory: web
-        # ci ไม่ใช่ install — ยึดตาม package-lock.json เป๊ะ ๆ
-        # ไม่งั้น CI อาจผ่านด้วยเวอร์ชันที่ต่างจากที่เครื่องเราใช้
+        # ใช้ dependency ตาม package-lock.json
         run: npm ci
 
       - name: ตรวจ lint ชนิดข้อมูล และรันเทส

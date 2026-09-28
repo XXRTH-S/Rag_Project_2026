@@ -57,7 +57,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-// ---------- types ----------
+// types
 
 /** ผลลัพธ์แบบแบ่งหน้า
  *
@@ -156,7 +156,7 @@ export type PromptConfig = {
   is_active: boolean;
 };
 
-// ---------- helpers ----------
+// helpers
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

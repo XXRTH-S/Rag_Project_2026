@@ -140,16 +140,8 @@ JOIN filtered f ON f.id = ids.id
 LEFT JOIN vec ON vec.id = ids.id
 LEFT JOIN kw ON kw.id = ids.id
 """
-# keyword "เพิ่มผู้สมัคร" ได้ ไม่ใช่แค่จัดอันดับใหม่
-#
-# เดิมออกแบบให้ผู้สมัครมาจาก vector pool อย่างเดียวเพื่อความปลอดภัย แต่ eval แสดงว่า
-# มันปิดประโยชน์หลักของ hybrid ทิ้ง — คำถามเชิงโครงสร้างอย่าง "ข้อ 3 พูดถึงอะไร"
-# หรือ "ประกาศออกเมื่อไหร่" มีความหมายทับกับเนื้อหาน้อยมาก dense retrieval จึงหาไม่เจอ
-# ทั้งที่ keyword ตรงเป๊ะ
-#
-# กันความเสี่ยงด้วยเกณฑ์คนละระดับแทน: chunk ที่มาจาก vector ต้องผ่าน min_score
-# ส่วน chunk ที่มาจาก keyword อย่างเดียวใช้เกณฑ์ต่ำกว่า (keyword_floor)
-# เพราะการตรงคำเป็นหลักฐานเพิ่มเติมในตัวมันเอง แต่ก็ยังต้องไม่หลุดโลกไปเลย
+# รวม candidate จากทั้ง vector และ keyword
+# ผลที่ตรง keyword ใช้ keyword_floor ส่วนผลอื่นใช้ min_score
 
 
 async def hybrid_search(
@@ -202,9 +194,7 @@ async def hybrid_search(
         similarity = float(row["similarity"])
         matched_keyword = row["krank"] is not None
 
-        # ตรงคำ = มีหลักฐานเพิ่มเติมที่ embedding ไม่ได้จับ จึงผ่อนเกณฑ์ similarity ลงได้
-        # ไม่เกี่ยวว่า vector จะหาเจอด้วยหรือไม่ — เคยเขียนเงื่อนไขกลับด้านตรงนี้
-        # ทำให้ chunk ที่ทั้งตรงคำและ vector เจอ กลับโดนเกณฑ์เข้มกว่า chunk ที่ตรงคำอย่างเดียว
+        # ใช้ keyword_floor เมื่อคำค้นตรง ไม่ว่า vector จะค้นพบ chunk นี้ด้วยหรือไม่
         floor = keyword_floor if matched_keyword else threshold
         if similarity < floor:
             continue

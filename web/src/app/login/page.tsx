@@ -69,11 +69,13 @@ export default function LoginPage() {
       <section className="login-panel">
         {/* หน้านี้ไม่มีแถบนำทาง จึงต้องมีปุ่มสลับโหมดของตัวเอง
             ไม่งั้นคนที่เข้ามาหน้าแรกสุดจะเปลี่ยนโหมดไม่ได้จนกว่าจะล็อกอินผ่าน */}
-        <div className="login-theme">
-          <ThemeToggle />
-        </div>
-        <div>
-          <h1>เข้าสู่ระบบ</h1>
+        <div className="login-content">
+          <div className="login-heading">
+            <h1>เข้าสู่ระบบ</h1>
+            <div className="login-theme">
+              <ThemeToggle />
+            </div>
+          </div>
           <p className="sub">ระบบสาธิตสำหรับการสัมภาษณ์ ใช้บัญชีทดสอบที่ผู้ดูแลเตรียมให้</p>
 
           <form onSubmit={submit} className="card">

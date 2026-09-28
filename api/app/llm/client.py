@@ -47,15 +47,7 @@ class ChatClient:
             "stream": stream,
         }
         if not thinking:
-            # ต้องส่งสองแบบเพราะแต่ละ runtime รู้จักคนละตัว
-            #
-            # chat_template_kwargs -> vLLM
-            # reasoning_effort     -> Ollama และ API ที่ทำตามสเปกของ OpenAI
-            #
-            # เดิมส่งแค่ chat_template_kwargs ซึ่ง **Ollama ไม่รู้จักและเพิกเฉย**
-            # ผลคือ thinking ทำงานอยู่ตลอด: คำถาม "1+1 เท่ากับเท่าไหร่" สร้าง reasoning
-            # ซ่อนไว้ 3,307 token ใช้เวลา 86 วินาที เทียบกับ 2 token ใน 0.6 วินาที
-            # เมื่อปิดถูกวิธี — ต่างกัน 143 เท่า และเป็นต้นเหตุที่คำตอบดีเลย์
+            # vLLM ใช้ chat_template_kwargs ส่วน Ollama ใช้ reasoning_effort เพื่อปิด thinking
             payload["chat_template_kwargs"] = {"enable_thinking": False}
             if settings.llm_reasoning_effort:
                 payload["reasoning_effort"] = settings.llm_reasoning_effort

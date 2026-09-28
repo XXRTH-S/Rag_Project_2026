@@ -6,7 +6,7 @@ from app.ingestion.clean import (
     strip_page_artifacts,
 )
 
-# ---------- clean ----------
+# clean
 
 
 def test_soft_hyphen_and_zero_width_are_removed() -> None:
@@ -46,7 +46,7 @@ def test_clean_pages_removes_header_and_page_numbers_together() -> None:
     assert all("บริษัท" not in page for page in cleaned)
 
 
-# ---------- chunk ----------
+# chunk
 
 
 def test_short_page_becomes_one_chunk() -> None:

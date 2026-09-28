@@ -29,35 +29,50 @@ log = logging.getLogger("app")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+    """งานตอนเริ่มระบบ — ห้ามมีอะไรในนี้ทำให้ app ขึ้นไม่ได้
+
+    ทุกอย่างที่นี่เป็นการ "เตรียมให้สะดวก" ไม่ใช่เงื่อนไขที่จำเป็นต่อการให้บริการ
+    ถ้าอันไหนล้มก็ควรแค่บันทึกไว้แล้วเดินต่อ · บน serverless การล้มตรงนี้
+    โผล่ออกไปเป็นแค่ FUNCTION_INVOCATION_FAILED ซึ่งไม่บอกอะไรเลย
+
+    เจอจริงตอนขึ้น Vercel ครั้งแรก: mkdir ของ UPLOAD_DIR ล้มเพราะ
+    ระบบไฟล์อ่านได้อย่างเดียว แล้วทั้ง API ขึ้นไม่ได้ทั้งที่ทุก endpoint
+    ที่จะใช้จริงไม่ได้แตะดิสก์เลย
+    """
+    # สร้างพื้นที่อัปโหลดเฉพาะเมื่อเปิด ingestion
+    if settings.ingestion_enabled:
+        try:
+            Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            log.warning("สร้าง UPLOAD_DIR ไม่ได้: %s — การนำเข้าเอกสารจะใช้ไม่ได้", exc)
+
     log.info(
-        "starting tier=%s llm=%s ocr=%s embed=%s",
+        "starting tier=%s llm=%s ocr=%s embed=%s ingestion=%s",
         settings.model_tier,
         settings.llm_model,
         settings.typhoon_ocr_model,
         settings.embedding_model,
+        settings.ingestion_enabled,
     )
 
-    # ห้ามล้มทั้ง app ถ้าตารางยังไม่ถูกสร้าง — ตอน setup ครั้งแรก api ต้องขึ้นมาให้ได้
-    # ก่อน แล้วค่อยรัน `alembic upgrade head` ผ่าน exec
+    # ให้ API เริ่มได้ก่อนรัน migration ในการติดตั้งครั้งแรก
     try:
         async with SessionLocal() as session:
             await ensure_admin_user(session)
     except Exception as exc:  # noqa: BLE001
         log.warning("ข้ามการสร้างบัญชี admin: %s — รัน alembic upgrade head แล้ว restart api", exc)
 
-    # โหลดโมเดลเข้า VRAM เบื้องหลัง ไม่ให้คำถามแรกต้องรอ 21 วินาที
-    schedule_warmup()
+    # warmup เบื้องหลังเฉพาะโหมด ingestion เพื่อไม่เรียกซ้ำทุก serverless cold start
+    if settings.ingestion_enabled:
+        try:
+            schedule_warmup()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ข้าม warmup: %s", exc)
 
     yield
 
 
-# /docs กับ /openapi.json เปิดสาธารณะตามค่าเริ่มต้นของ FastAPI ซึ่งเท่ากับแจกผัง
-# ของทั้ง API ให้คนที่ยังไม่ได้ล็อกอิน รวมถึงชื่อ endpoint ฝั่ง admin และรูปร่าง payload
-# ทั้งหมด — เป็นแผนที่ชั้นดีให้คนที่จะลองโจมตี
-#
-# ยังเปิดไว้ตอน dev เพราะจำเป็นกับการต่อ frontend แต่ต้องปิดเมื่อขึ้นใช้จริง
-# คุมด้วย API_DOCS_ENABLED ใน .env ไม่ผูกกับ tier เพราะ tier บอกเรื่องโมเดล ไม่ใช่เรื่องความปลอดภัย
+# เปิดเอกสาร API ตาม API_DOCS_ENABLED; ไม่ผูกกับ tier ของโมเดล
 _docs_enabled = settings.api_docs_enabled
 
 app = FastAPI(

@@ -27,12 +27,12 @@ USER app
 EXPOSE 8000
 
 
-# ---- dev: hot reload, โค้ด mount ทับจาก host ----
+# dev: hot reload, โค้ด mount ทับจาก host
 FROM base AS dev
 USER root
 RUN pip install pytest pytest-asyncio ruff
 USER app
 
 
-# ---- prod ----
+# prod
 FROM base AS prod

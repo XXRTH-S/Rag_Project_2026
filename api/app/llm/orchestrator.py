@@ -100,13 +100,7 @@ async def ensure_session(
     if session_id is not None:
         existing = await session.get(ChatSession, session_id)
         if existing is not None:
-            # ต้องเช็คเจ้าของก่อนคืน · ก่อนหน้านี้คืนให้ใครก็ได้ที่ส่ง id มาถูก
-            # ซึ่งเปิดช่องสองทาง: เขียนข้อความลงบทสนทนาของคนอื่น และที่หนักกว่าคือ
-            # อ่านของเขาได้ เพราะ stream_answer เอา _recent_history ของ session นั้น
-            # ใส่เข้า prompt ถามว่า "สรุปบทสนทนาก่อนหน้า" ก็ได้เนื้อหาของคนอื่นกลับมา
-            #
-            # id เป็น UUIDv4 จึงเดาไม่ได้ตรง ๆ แต่มันหลุดได้ทั้งจาก log ภาพหน้าจอ
-            # และลิงก์ที่แชร์กัน — ความลับของ id ไม่ใช่การควบคุมสิทธิ์
+            # ตรวจเจ้าของ session ก่อนอ่านประวัติหรือเพิ่มข้อความ แม้จะรู้ session ID ก็ตาม
             if existing.user_id != user_id:
                 raise SessionNotOwned
             return existing
@@ -182,8 +176,7 @@ async def _record(
 ) -> uuid.UUID:
     session.add(ChatMessage(session_id=chat_session.id, role="user", content=question))
 
-    # ตั้งหัวข้อตอนมีคำถามแรกที่ใช้ได้จริง · คำทักทายล้วนให้ข้ามไปรอคำถามถัดไป
-    # เขียนครั้งเดียวแล้วไม่แตะอีก เพราะหัวข้อที่เปลี่ยนไปมาทำให้หาบทสนทนาเก่าไม่เจอ
+    # ตั้งหัวข้อครั้งเดียวจากคำถามแรกที่ไม่ใช่คำทักทาย
     if chat_session.title is None:
         chat_session.title = derive_title(question)
 
@@ -296,8 +289,7 @@ async def answer_question(
     except httpx.HTTPError as exc:
         if not settings.llm_fallback_to_excerpts:
             raise
-        # เหมือนกับเส้นทาง streaming — context หาเจอแล้ว การเรียบเรียงต่างหากที่ล้ม
-        # ก่อนหน้านี้เส้นทางนี้ไม่มี fallback ทำให้ Playground ตอบ 500 ขณะที่ chat ยังใช้ได้
+        # ใช้ข้อความจากเอกสารแทนเมื่อ LLM ล้มเหลว เช่นเดียวกับเส้นทาง streaming
         log.warning("เรียก LLM ไม่สำเร็จ ใช้ข้อความจากเอกสารแทน: %s", exc)
         answer = excerpt_fallback(hits)
 
@@ -412,8 +404,7 @@ async def stream_answer(
     except httpx.HTTPError as exc:
         if not settings.llm_fallback_to_excerpts:
             raise
-        # ยังหา context เจอแล้ว การเรียบเรียงต่างหากที่ล้ม — ยกข้อความต้นทางมาให้แทน
-        # ดีกว่าโยน HTTP error ดิบใส่ผู้ใช้ และทำให้ระบบยังใช้งานได้ระหว่างรอโมเดล
+        # หาก LLM ล้มเหลว ให้คืนข้อความจากเอกสารที่ค้นพบ
         log.warning("เรียก LLM ไม่สำเร็จ ใช้ข้อความจากเอกสารแทน: %s", exc)
         fallback = excerpt_fallback(hits)
         parts = [fallback]

@@ -42,13 +42,7 @@ def _detect_mime(head: bytes, filename: str) -> str:
     if mime == "application/zip" and filename.lower().endswith(".docx"):
         return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-    # libmagic แยกชนิดย่อยของไฟล์ข้อความจากเนื้อหา เอกสารที่ยกตัวอย่างโค้ดจึงได้
-    # text/x-c หรือ text/x-java แล้วถูกปฏิเสธว่า "ยังไม่รองรับ" ทั้งที่เป็นข้อความล้วน
-    # (เจอจริงตอนอัปคู่มือสอนเขียนโปรแกรม — ไฟล์ Go ยังถูกมองเป็น text/x-c ด้วยซ้ำ)
-    #
-    # ชนิดย่อยพวกนี้ไม่มีผลต่อวิธีอ่านไฟล์เลย extract_text อ่านทุกอย่างที่ไม่ใช่
-    # docx/html เป็นข้อความธรรมดาอยู่แล้ว จึงยุบให้เหลือชนิดที่ระบบจัดการจริง
-    # ความปลอดภัยไม่เสีย เพราะไฟล์ไบนารีไม่มีทางถูก libmagic ตอบเป็น text/*
+    # รวม MIME ของข้อความย่อยเป็นชนิดที่ parser รองรับ เช่น text/x-c เป็นข้อความธรรมดา
     if mime.startswith("text/") and mime not in {"text/html"}:
         return "text/markdown" if filename.lower().endswith(".md") else "text/plain"
     return mime
@@ -173,10 +167,7 @@ async def upload_document(
         queue=ingest_queue.queue_for(user.is_admin),
     )
     session.add(job)
-    # ต้อง commit ให้แถวงานมองเห็นได้จากคอนเนกชันอื่น *ก่อน* ส่งเข้าคิว
-    # ไม่งั้น worker อาจหยิบงานไปทำก่อนธุรกรรมนี้จบ แล้วหาแถวไม่เจอ
-    # จบไปเงียบ ๆ ด้วยผล missing_job ทิ้งเอกสารค้างสถานะ pending ตลอดกาล
-    # (เจอจริงตอนอัปเอกสาร 8 ไฟล์รวดเดียว หลุดไป 1 ไฟล์)
+    # commit ก่อนส่งเข้าคิว เพื่อให้ worker มองเห็นแถวงานจากอีก connection
     await session.commit()
 
     try:
@@ -260,13 +251,8 @@ async def delete_document(
 
     owner = await session.get(User, document.owner_id)
 
-    # คืนโควตาเฉพาะเอกสารที่ยังไม่ได้ใช้ GPU และลบภายในวันเดียวกับที่อัปโหลด
-    #
-    # ไม่คืนถ้าผ่าน OCR ไปแล้ว เพราะทรัพยากรถูกใช้ไปจริง ถ้าคืนให้ user จะอัป-ลบ-อัป
-    # วนได้ไม่จำกัดและยึดคิว GPU ทั้งวันโดยไม่เสียโควตาเลย
-    #
-    # ไม่คืนข้ามวันเพราะโควตารีเซ็ตรายวันอยู่แล้ว การคืนย้อนหลังจะทำให้ยอดของวันนี้
-    # เกินเพดานที่ตั้งไว้
+    # คืนโควตาเฉพาะเอกสารที่ยังไม่ใช้ GPU และลบในวันอัปโหลด
+    # ไม่คืนหลัง OCR หรือข้ามวัน เพื่อป้องกันการอัปโหลดวนและยอดโควตาคลาดเคลื่อน
     result = await session.execute(
         select(IngestionJob)
         .where(IngestionJob.document_id == document_id)

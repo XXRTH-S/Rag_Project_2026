@@ -155,8 +155,7 @@ function ChatInner({ isAdmin }: { isAdmin: boolean }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  // บนการ์ดนี้กว่า token แรกจะออกมาใช้เวลา 15–37 วินาที ถ้าไม่มีอะไรขยับเลย
-  // ผู้ใช้จะคิดว่าระบบค้างแล้วถามซ้ำ — ตัวจับเวลาบอกว่ายังทำงานอยู่
+  // แสดงเวลารอระหว่างค้นเอกสารและสร้างคำตอบ
   useEffect(() => {
     if (!busy) return;
     const started = Date.now();

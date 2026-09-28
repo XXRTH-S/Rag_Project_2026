@@ -55,7 +55,7 @@ def clean_breaker():
     reset_breaker()
 
 
-# ---------- การตั้งค่า ----------
+# การตั้งค่า
 
 
 def test_fallback_is_off_when_base_url_is_blank(monkeypatch) -> None:
@@ -76,7 +76,7 @@ def test_fallback_inherits_main_model_name_when_not_set(monkeypatch) -> None:
     assert providers()[1].client.model == settings.llm_model
 
 
-# ---------- complete ----------
+# complete
 
 
 async def test_uses_primary_when_it_works(monkeypatch) -> None:
@@ -111,7 +111,7 @@ async def test_raises_when_every_provider_fails(monkeypatch) -> None:
         await ChatChain().complete([{"role": "user", "content": "hi"}])
 
 
-# ---------- stream ----------
+# stream
 
 
 async def test_stream_switches_before_any_token(monkeypatch) -> None:
@@ -142,7 +142,7 @@ async def test_stream_does_not_switch_after_tokens_were_sent(monkeypatch) -> Non
     assert backup.calls == 0, "ต้องไม่เรียกตัวสำรองหลังส่งคำตอบไปบางส่วนแล้ว"
 
 
-# ---------- circuit breaker ----------
+# circuit breaker
 
 
 async def test_breaker_stops_calling_a_dead_primary(monkeypatch) -> None:

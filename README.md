@@ -300,17 +300,55 @@ Vercel ไม่มี Postgres, Redis, GPU หรือ embedding server ให
 ### ค่าที่ต้องตั้งบน Vercel
 
 ```
-DATABASE_URL=postgresql+asyncpg://...
+DATABASE_URL=<วาง connection string ที่ Neon/Supabase ให้มาได้เลย>
 REDIS_URL=rediss://...
 APP_SECRET_KEY=<ค่าเดียวกับที่ใช้อยู่ ไม่งั้น cookie เดิมใช้ไม่ได้>
 LLM_BASE_URL=...        LLM_API_KEY=...        LLM_MODEL=...
 EMBEDDING_BASE_URL=...  EMBEDDING_API_KEY=...
 INGESTION_ENABLED=false
+DB_POOL_ENABLED=false
 API_DOCS_ENABLED=false
 COOKIE_SECURE=true
 TRUSTED_PROXY_HOPS=1
 CORS_ALLOWED_ORIGINS=https://<โดเมนของ frontend>
+PYTHAINLP_DATA_DIR=/tmp/pythainlp
 ```
+
+**`PYTHAINLP_DATA_DIR` ต้องชี้ไปที่ `/tmp`** — pythainlp สร้างไดเรกทอรีข้อมูล
+ใน HOME ตอนเรียกครั้งแรก แต่ระบบไฟล์ของ serverless เขียนได้แค่ `/tmp`
+ถ้าไม่ตั้ง ตัวตัดคำจะใช้ไม่ได้ แล้ว keyword leg จะถอยไปแยกคำแบบหยาบ
+(ระบบยังตอบได้ แต่หาคำไทยแย่ลง และจะมีคำเตือนใน log)
+
+**`DATABASE_URL` วางตรง ๆ ได้** — Neon กับ Supabase คืน URL ขึ้นต้นด้วย
+`postgresql://` ซึ่ง SQLAlchemy แปลว่า "ใช้ psycopg2" ที่เราไม่ได้ติดตั้ง
+ระบบเติม `+asyncpg` ให้เองและย้าย `sslmode` ไปเป็น connect arg ให้ด้วย
+(ถ้าไม่ทำ จะพังตั้งแต่ตอน import แล้วเห็นแค่ `FUNCTION_INVOCATION_FAILED`)
+
+**`DB_POOL_ENABLED=false` สำคัญ** — connection pool มีประโยชน์กับโปรเซสที่อยู่ยาว
+แต่ serverless เปิดโปรเซสใหม่ได้เป็นสิบพร้อมกัน แต่ละตัวถือ pool ของตัวเอง
+รวมกันจนเกินเพดาน connection ของฐานข้อมูลที่ให้ฟรีแทบทุกเจ้า
+
+### ถ้าเจอ FUNCTION_INVOCATION_FAILED
+
+Vercel ไม่แสดงสาเหตุบนหน้าเว็บ แต่ traceback อยู่ใน log ของ function
+
+```powershell
+npx vercel logs <โดเมนที่ deploy ไป>
+```
+
+**ดูให้ถูกโปรเจกต์ก่อน** — หน้า error ของ Vercel หน้าตาเหมือนกันทั้งฝั่ง API
+และฝั่งหน้าเว็บ ให้ดูว่าโดเมนที่เปิดอยู่เป็นของโปรเจกต์ไหน
+
+สาเหตุที่เจอมาแล้วและแก้ไปแล้ว — เผื่อไว้เทียบอาการ:
+
+| อาการใน log | ฝั่ง | ต้นเหตุ |
+|---|---|---|
+| `TypeError: Invalid URL` หรือ `BACKEND_HTTPS_ORIGIN must be...` | หน้าเว็บ | `rewrites()` ใน `next.config.mjs` ทำงานตอน server เริ่ม ไม่ใช่แค่ตอน build · ค่าที่พิมพ์ผิดตัวเดียว (ลืม `https://`, มี path ต่อท้าย) เคยทำให้ทั้งเว็บขึ้นไม่ได้ · ตอนนี้บันทึก log แล้วข้ามการ proxy แทนการ throw |
+| `OSError: [Errno 30] Read-only file system` | API | lifespan สร้าง `UPLOAD_DIR` · ตอนนี้ข้ามให้เมื่อปิด ingestion |
+| `ModuleNotFoundError: No module named 'psycopg2'` | API | `DATABASE_URL` ไม่มี `+asyncpg` · ตอนนี้เติมให้เอง |
+| `TypeError: connect() got an unexpected keyword argument 'sslmode'` | API | query param ของ libpq ติดมากับ URL · ตอนนี้ย้ายไป connect arg ให้ |
+| `ModuleNotFoundError: No module named 'app'` | API | แพ็กเกจไม่ได้ถูก bundle · ดู `includeFiles` ใน `vercel.json` |
+| ตอบคำถามแล้วล้มทุกครั้ง แต่ `/health` ปกติ | API | pythainlp เขียนไดเรกทอรีข้อมูลไม่ได้ · ตั้ง `PYTHAINLP_DATA_DIR=/tmp/pythainlp` |
 
 ### deploy
 

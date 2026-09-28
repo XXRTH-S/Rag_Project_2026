@@ -12,7 +12,7 @@ from app.models.user import User
 from app.retrieval.keywords import THAI_STOPWORDS, to_search_text, to_tsquery, tokenize
 from app.retrieval.search import hybrid_search, search, vector_search
 
-# ---------- tokenize ----------
+# tokenize
 
 
 def test_thai_is_segmented_into_words() -> None:
@@ -55,7 +55,7 @@ def test_tsquery_strips_operator_characters() -> None:
         assert char not in q
 
 
-# ---------- hybrid ----------
+# hybrid
 
 
 def _vector(axis: int, weight: float = 1.0) -> list[float]:

@@ -42,3 +42,17 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml -f docker-compo
 Keep this computer, Docker and ngrok running while presenting. The HTTPS override enables Secure cookies and disables trusting caller-supplied forwarding headers. Login throttling is conservatively shared at the proxy connection in this mode.
 
 The current tunnel URL was assigned automatically. After restarting ngrok, verify its URL; if it changes, update Vercel's production `BACKEND_HTTPS_ORIGIN` and redeploy with `vercel-deploy.ps1 --prod --yes`. Use a reserved ngrok domain for a stable URL. Root `.env` must never be uploaded.
+## Recovery verified 2026-09-23
+
+The `rag-project-2026` Vercel project is the Next.js frontend only. Its Root Directory is `web`, framework is Next.js, build command is `npm run build`, install command is `npm install`. `vercel-deploy.ps1` uploads from the repository root and explicitly selects `web/vercel.json`; do not deploy the root Python API configuration into this frontend project.
+
+The restored demo currently uses the local Docker API through ngrok. A separate cloud API was not provisioned: local DATABASE_URL, Redis and model endpoints refer to Docker services; production secrets stored as non-readable Vercel secrets cannot be copied by env pull. Cloud migration still needs working external dependencies and credentials.
+
+Playwright verified five demo logins, document quotas, twenty cross-account document denials, rejection of a wrong password and a chat response on the recovered frontend. Keep Docker and ngrok running. A new tunnel URL requires updating BACKEND_HTTPS_ORIGIN and redeploying.
+## Check or recover the active demo URL
+
+Run `./sync-demo-url.ps1` to check the active Docker tunnel and the production API proxy without changing settings. It checks JSON `/health` (200) and unauthenticated `/api/auth/me` (401), rejecting HTML interstitials and redirects. These checks do not verify model readiness or a complete login.
+
+If the tunnel URL changes, run `./sync-demo-url.ps1 -Apply`. After checking the backend, this updates only production `BACKEND_HTTPS_ORIGIN`, deploys the frontend project, then verifies the public API proxy. Vercel CLI login and `web/.vercel/project.json` are required. If deployment fails after the environment update, the script stops; fix the build and rerun. Existing deployments are not rewritten merely by updating the environment variable.
+
+This recovery command does not make an automatically assigned URL permanent. A fixed ngrok domain must be obtained from the account dashboard and explicitly configured before tunnel startup.

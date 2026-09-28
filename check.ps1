@@ -14,11 +14,8 @@ function Show-Status {
     & .\dc.ps1 ps --format "table {{.Service}}`t{{.Status}}"
 
     Write-Host "`n[ ความคืบหน้าโหลดโมเดล ]" -ForegroundColor Yellow
-    # โหลดผ่าน curl ลง blob โดยตรง (เร็วกว่า ollama pull หลายเท่าบนลิงก์ที่สะดุดบ่อย)
-    # ไฟล์ tmp-* คือตัวที่กำลังโหลด ส่วน sha256-* คือที่เสร็จแล้ว
-    # tmp-* = กำลังโหลด, sha256-* = เสร็จแล้ว (ตัดชื่อ digest ให้สั้นพอจำแนกได้)
-    # ห้ามมี double quote ในสตริงนี้ — PowerShell 5.1 กิน quote ทิ้งตอนส่งให้ native command
-    # แล้วสคริปต์ sh จะพังเงียบ ๆ (คืนค่าว่างโดยไม่มี error)
+    # tmp-* คือไฟล์ที่กำลังโหลด ส่วน sha256-* โหลดเสร็จแล้ว
+    # หลีกเลี่ยง double quote ในคำสั่งนี้ เพราะ PowerShell 5.1 ส่งต่อให้ native command ไม่ครบ
     $listBlobs = 'for f in /m/models/blobs/tmp-* /m/models/blobs/sha256-*; do case $f in *partial*) continue;; esac; [ -f $f ] || continue; echo $(( $(stat -c %s $f) / 1048576 )) MB $(basename $f | cut -c1-20); done'
     $blobs = docker run --rm --user root -v rag-workshop_ollama-models:/m rag-workshop-api:latest sh -c $listBlobs 2>$null
     if ($blobs) { $blobs | ForEach-Object { Write-Host "  $_" } }

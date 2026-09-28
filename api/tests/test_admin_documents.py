@@ -48,7 +48,7 @@ async def _upload(client: AsyncClient, headers: dict[str, str], name: str = "a.t
     return resp.json()["document"]["id"]
 
 
-# ---------- reprocess ----------
+# reprocess
 
 
 async def test_reprocess_creates_a_new_job(
@@ -194,7 +194,7 @@ async def test_reprocess_rejects_invalid_task_type(client: AsyncClient, admin: U
     assert resp.status_code == 422
 
 
-# ---------- bulk ----------
+# bulk
 
 
 async def test_bulk_accepts_multiple_files(client: AsyncClient, admin: User) -> None:

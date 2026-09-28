@@ -29,7 +29,7 @@ $compose = 'docker compose -f docker-compose.yml -f docker-compose.local.yml'
 
 Write-Host "สำรองข้อมูลไปที่ $dir" -ForegroundColor Cyan
 
-# ---------- ฐานข้อมูล ----------
+# ฐานข้อมูล
 Write-Host "  [1/2] ฐานข้อมูล..." -NoNewline
 $dumpFile = Join-Path $dir 'postgres.dump'
 
@@ -50,7 +50,7 @@ if ((Test-Path $dumpFile) -and (Get-Item $dumpFile).Length -gt 1024) {
     exit 1
 }
 
-# ---------- ไฟล์ที่อัปโหลด ----------
+# ไฟล์ที่อัปโหลด
 Write-Host "  [2/2] ไฟล์ที่อัปโหลด..." -NoNewline
 $uploadsFile = Join-Path $dir 'uploads.tar.gz'
 # ใช้ image ของโปรเจกต์เอง ไม่ดึง alpine เพิ่ม — บนเน็ตช้าการ pull image ใหม่ทำให้ backup ล้ม
@@ -63,7 +63,7 @@ if (Test-Path $uploadsFile) {
     Write-Host " ข้าม (ยังไม่มีไฟล์)" -ForegroundColor Yellow
 }
 
-# ---------- ลบของเก่า ----------
+# ลบของเก่า
 $cutoff = (Get-Date).AddDays(-$KeepDays)
 $removed = 0
 Get-ChildItem -Path $Path -Directory -ErrorAction SilentlyContinue |

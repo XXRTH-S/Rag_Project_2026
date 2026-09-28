@@ -121,6 +121,26 @@ async def test_admin_ingestion_paths_are_closed_too(
     assert resp.status_code == 503
 
 
+async def test_startup_survives_a_read_only_filesystem(monkeypatch) -> None:
+    """lifespan ต้องไม่ทำให้ app ขึ้นไม่ได้ ไม่ว่าจะเตรียมอะไรไม่สำเร็จ
+
+    เจอจริงตอนขึ้น Vercel ครั้งแรก (22 ก.ย. 2026): lifespan เรียก
+    `Path(UPLOAD_DIR).mkdir()` เป็นบรรทัดแรก แต่ระบบไฟล์ของ serverless
+    เขียนได้แค่ /tmp · mkdir โยน OSError แล้วทั้ง API ขึ้นไม่ได้
+    ทั้งที่ทุก endpoint ที่จะใช้จริงไม่ได้แตะดิสก์เลย
+
+    อาการที่เห็นคือ FUNCTION_INVOCATION_FAILED เฉย ๆ ซึ่งไม่บอกอะไร
+    """
+    from app.main import app, lifespan
+
+    monkeypatch.setattr(settings, "upload_dir", "/proc/ไม่มีทางเขียนได้/uploads")
+
+    for ingestion in (True, False):
+        monkeypatch.setattr(settings, "ingestion_enabled", ingestion)
+        async with lifespan(app):
+            pass  # ขึ้นได้ = ผ่าน · ที่เหลือแค่ต้องไม่โยน exception ออกมา
+
+
 def test_ingestion_is_open_by_default() -> None:
     """ค่าเริ่มต้นต้องไม่ปิด ไม่งั้นเครื่องที่มี worker จริงจะใช้งานไม่ได้"""
     from app.core.config import Settings

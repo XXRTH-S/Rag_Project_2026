@@ -19,7 +19,7 @@
 
   var state = { open: false, busy: false, sessionId: null, config: null };
 
-  // ---------- ui ----------
+  // ui
 
   var host = document.createElement("div");
   host.id = "rag-widget";
@@ -83,14 +83,8 @@
     return node;
   }
 
-  // ตัดเลขอ้างอิง [1] [2] ออก เพราะ widget ไม่แสดงรายการที่มา
-  // ปล่อยเลขไว้โดยไม่มีอะไรให้ชี้ ผู้ใช้จะคิดว่าหน้าจอแสดงผลพัง
-  //
-  // ตัดเฉพาะเลขที่อยู่ในช่วงของที่มาจริง เพราะวงเล็บเหลี่ยมในเนื้อความก็มีได้
-  // ("ประกาศข้อ [3] ระบุว่า…" ที่ OCR อ่านมาจากเอกสาร) ถ้าตัดหมดทุกตัว
-  // ข้อความของเอกสารจะหายไปด้วยโดยไม่มีใครรู้
-  //
-  // กฎสุดท้ายตัดวงเล็บที่ยังพิมพ์ไม่จบท้ายสตรีม ไม่งั้นเลขจะโผล่แล้วหายวับทุก token
+  // ซ่อนเฉพาะเลขอ้างอิงที่มีแหล่งที่มาจริง และส่วนท้ายที่ยัง stream ไม่ครบ
+  // เก็บเลขในวงเล็บที่เป็นเนื้อหาเอกสารไว้
   function stripCitationMarkers(value, citationCount) {
     if (!citationCount) return value;
     return value
@@ -114,7 +108,7 @@
     return (state.config && state.config.accent_color) || "#4f46e5";
   }
 
-  // ---------- config ----------
+  // config
 
   fetch(API + "/api/widget/config", { credentials: "include" })
     .then(function (r) {
@@ -146,7 +140,7 @@
       bubble("bot", "ต่อระบบไม่ได้ ลองใหม่อีกครั้งภายหลัง");
     });
 
-  // ---------- chat ----------
+  // chat
 
   fab.onclick = function () {
     state.open = !state.open;
@@ -172,8 +166,7 @@
     var text = "";
     var citationCount = 0;
 
-    // กว่า token แรกจะออกมาใช้เวลา 15-37 วินาทีบนการ์ดนี้
-    // ถ้าไม่มีอะไรขยับเลย ผู้ใช้จะคิดว่าระบบค้างแล้วถามซ้ำ
+    // แสดงเวลารอระหว่างค้นเอกสารและสร้างคำตอบ
     var started = Date.now();
     var progress = el("div", "working", "กำลังค้นเอกสาร…");
     answer.appendChild(progress);
@@ -211,9 +204,7 @@
           } else if (name === "citations" && data.citations.length) {
             // เก็บแค่จำนวน เพื่อรู้ว่าเลขในวงเล็บตัวไหนเป็นการอ้างอิงจริง
             citationCount = data.citations.length;
-            // widget เป็นหน้าบ้านสำหรับผู้ใช้ทั่วไป จึงไม่แสดงรายการที่มา
-            // (admin ดูได้ที่หน้าแชทของระบบ ซึ่งแสดงพร้อมคะแนนไว้ตรวจคุณภาพ retrieval)
-            // ยังบอกว่าค้นเจอแล้วเพื่อให้รู้ว่าไม่ได้ค้าง แต่ไม่บอกจำนวนสิ่งที่จะไม่ได้เห็น
+            // แสดงสถานะค้นพบข้อมูลโดยไม่แสดงรายการอ้างอิงใน widget
             label = "ค้นเจอเอกสารที่เกี่ยวข้องแล้ว · กำลังเรียบเรียงคำตอบ";
           } else if (name === "error") {
             stopProgress();

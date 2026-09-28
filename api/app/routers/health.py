@@ -188,9 +188,7 @@ async def health_deep(
     ตอบได้โดยไม่ต้องล็อกอิน เพราะ monitor ภายนอกและ `check.ps1` ต้องเรียกได้
     แต่ตอบ *ไม่เท่ากัน*: รายละเอียดทั้งหมดเห็นเฉพาะ admin
     """
-    # เช็ค DB ให้จบก่อน ไม่เอาไปรวมใน gather กับ network check ที่ช้า
-    # ถ้า client ตัดการเชื่อมต่อระหว่างรอ network session จะถูกปิดขณะ query ยังทำงาน
-    # แล้วได้ IllegalStateChangeError ซึ่งทำให้ health check เองกลายเป็น 500
+    # ตรวจ DB ก่อน gather เพื่อไม่ให้ session ถูกปิดขณะ query ยังทำงานเมื่อ client ยกเลิก
     postgres = await _check_postgres(session)
 
     redis_status, llm, ocr, embeddings, gpu_models = await asyncio.gather(

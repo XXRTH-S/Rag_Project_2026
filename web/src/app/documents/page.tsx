@@ -92,11 +92,7 @@ function DocumentsInner({ user }: { user: Me }) {
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // ขยายเพดานทีละหน้าแทนการสะสมรายการที่โหลดมา
-  //
-  // หน้านี้ refresh ตัวเองเป็นระยะระหว่างที่มีงานประมวลผล ถ้าสะสมทีละหน้า
-  // รายการที่โหลดไว้จะชนกับผลของ refresh (ซ้ำบ้าง หายบ้าง เมื่อมีเอกสารใหม่
-  // แทรกขึ้นมาด้านบน) การขอ limit ที่ใหญ่ขึ้นแล้วแทนที่ทั้งชุดจึงตรงกว่า
+  // เพิ่ม limit แล้วแทนที่ทั้งรายการ เพื่อไม่ให้ข้อมูลซ้ำหรือหายระหว่าง polling
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [totalDocuments, setTotalDocuments] = useState(0);
 
@@ -132,12 +128,7 @@ function DocumentsInner({ user }: { user: Me }) {
 
   const hasActiveWork = documents.some((d) => ACTIVE_STATES.has(d.status));
 
-  // ยิงถี่เฉพาะตอนมีงานกำลังประมวลผลจริง
-  //
-  // เดิมยิงทุก 5 วินาทีตลอดเวลา แม้ไม่มีงานค้างและแม้ผู้ใช้ย่อแท็บทิ้งไว้
-  // แต่ละรอบคือ 2 request บวกอีก 1 ต่อเอกสารที่ยังไม่เสร็จ — เปิดค้างไว้
-  // ทั้งวันก็กินเครื่องฟรี ๆ ทั้งที่หน้าจอไม่มีอะไรเปลี่ยน และเครื่องนี้
-  // ต้องเอาแรงไปให้ OCR กับ LLM
+  // poll เฉพาะเมื่อมีงานกำลังประมวลผล
   useEffect(() => {
     refresh();
 
@@ -156,8 +147,7 @@ function DocumentsInner({ user }: { user: Me }) {
       }
     };
 
-    // แท็บที่ถูกซ่อนไม่มีใครดู แต่ยังกินเครื่องเท่าเดิมถ้าไม่หยุด
-    // กลับมาดูเมื่อไหร่ก็ refresh ทันทีหนึ่งครั้ง ไม่ต้องรอครบรอบ
+    // หยุด polling เมื่อซ่อนแท็บ และ refresh ทันทีเมื่อกลับมา
     const onVisibility = () => {
       if (document.hidden) {
         stop();

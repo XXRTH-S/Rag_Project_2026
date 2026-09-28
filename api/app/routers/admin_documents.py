@@ -81,14 +81,7 @@ async def reprocess_document(
         )
     ).scalar_one_or_none()
     if running is not None:
-        # งานที่เข้าคิวไว้แต่ไม่เคยถูกหยิบไปทำ (started_at ว่าง) แปลว่า worker
-        # ตายหรือรีสตาร์ทระหว่างทาง แถวนั้นจะค้างอยู่ตลอดไปเพราะไม่มีใครมาปิดให้
-        # ผลคือเอกสารนั้น reprocess ไม่ได้อีกเลย ทั้งที่ chunk ถูกลบไปแล้ว —
-        # ทางออกเดียวคือเข้าไปแก้ SQL เอง ซึ่งไม่ควรเป็นวิธีกู้คืนของ admin
-        #
-        # เก็บกวาดเฉพาะเคสที่ "ไม่เคยเริ่ม" เท่านั้น · งานที่เริ่มแล้วค้างกลางทาง
-        # แยกจากงานที่กำลังทำอยู่จริงไม่ได้ ถ้าไม่มี heartbeat — 500 หน้าใช้เวลา
-        # เกินชั่วโมง การไปปิดมันทิ้งจะทำลายงานที่กำลังเดินอยู่
+        # อนุญาตให้ประมวลผลงานค้างใหม่หลังเวลานี้; ควรตั้งให้มากกว่าเวลารอคิวปกติ
         stale_after = timedelta(minutes=settings.ingestion_stale_after_minutes)
         never_started = running.started_at is None
         waited_too_long = datetime.now(UTC) - running.queued_at > stale_after

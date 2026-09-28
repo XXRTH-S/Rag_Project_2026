@@ -4,17 +4,8 @@
 	auto_https off
 
 	servers {
-		# ค่าเริ่มต้นของ Caddy คือ "เขียนทับ X-Forwarded-For ด้วย IP ของ peer เสมอ"
-		# ซึ่งปลอดภัยดีเมื่อ Caddy เป็นด่านแรก แต่พังเมื่อมี tunnel คั่นอยู่ข้างหน้า
-		# เพราะ IP ของ peer กลายเป็นคอนเทนเนอร์ ngrok เหมือนกันหมดทุกคำขอ
-		# แล้ว rate limit ก็ยุบเป็นถังเดียวทั้งโลก (เจอจริง 21 ก.ย. 2026)
-		#
-		# บอกให้เชื่อ peer ที่อยู่ในวง private เพื่อให้ Caddy *ต่อท้าย* แทนการเขียนทับ
-		# ผู้เรียกจากอินเทอร์เน็ตไม่เคยเป็น peer โดยตรงอยู่แล้ว (มี tunnel หรือ
-		# docker port mapping คั่นเสมอ) การเชื่อวง private จึงไม่ได้เปิดช่องให้ใคร
-		#
-		# ตัวที่กันการปลอมจริง ๆ คือฝั่ง API ที่นับ entry จากขวาเข้ามาตาม
-		# TRUSTED_PROXY_HOPS ไม่ใช่การหยิบตัวซ้ายสุด — ดู app/core/ratelimit.py
+		# เชื่อ forwarding headers จาก proxy ในเครือข่าย private
+		# API ต้องตั้ง TRUSTED_PROXY_HOPS ให้ตรงกับเส้นทางจริงเพื่อป้องกันการปลอม IP
 		trusted_proxies static private_ranges
 	}
 }
@@ -22,8 +13,7 @@
 :80 {
 	encode zstd gzip
 
-	# health อยู่นอก /api ตามสเปกของ orchestrator ทั่วไป (k8s, docker healthcheck)
-	# ถ้าไม่ route ไว้ที่นี่ monitor ภายนอกที่ยิงพอร์ต 80 จะไปโดนหน้าเว็บแล้วได้ 404
+	# ส่ง health check ไปยัง API แทนหน้าเว็บ
 	handle /health* {
 		reverse_proxy api:8000
 	}
