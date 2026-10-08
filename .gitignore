@@ -35,3 +35,7 @@ output/playwright/
 artifacts/
 # log ที่ playwright CLI ทิ้งไว้ตอน debug หน้าเว็บ — มี URL และ state ของ session
 .playwright-cli/
+
+# Keep handover documents local.
+/docs/handover/RAG_Workshop_Junior_Handbook_TH.md
+/docs/handover/RAG_Workshop_Junior_Handbook_TH.docx
